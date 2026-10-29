@@ -86,17 +86,40 @@ function App() {
     }
   };
 
-  // تبدیل عکس به Base64 برای ارسال به سرور
+  // 🔥 تابع جدید: فشرده‌سازی عکس و تبدیل به Base64 برای سرعت بالا
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200; // عرض حداکثر ۱۲۰۰ پیکسل (مناسب برای OCR)
+          const scaleSize = MAX_WIDTH / img.width;
+          
+          if (img.width <= MAX_WIDTH) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+          } else {
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+          }
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          // تبدیل به JPEG با کیفیت 80 درصد برای کاهش حجم
+          const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+          resolve(base64);
+        };
+        img.onerror = (error) => reject(error);
+      };
       reader.onerror = (error) => reject(error);
     });
   };
 
-  // اتصال به هوش مصنوعی از طریق Netlify Function
   const handleExtract = async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -105,6 +128,7 @@ function App() {
     setErrorMsg('');
 
     try {
+      // استفاده از تابع فشرده‌ساز
       const base64Data = await fileToBase64(selectedFile);
       
       const response = await fetch('/.netlify/functions/extract', {
@@ -112,7 +136,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: base64Data,
-          mimeType: selectedFile.type
+          mimeType: 'image/jpeg' // چون فشرده کردیم، فرمتش JPEG میشه
         })
       });
 
@@ -125,7 +149,7 @@ function App() {
       setExtractedText(data.text);
     } catch (error) {
       console.error(error);
-      setErrorMsg("خطا در استخراج متن. لطفا اتصال اینترنت را بررسی کنید. " + error.message);
+      setErrorMsg("خطا در استخراج متن. لطفا اینترنت را بررسی کنید. " + error.message);
     } finally {
       setIsExtracting(false);
     }
@@ -141,10 +165,11 @@ function App() {
     if (!extractedText.trim()) return;
     
     if (isNew) {
+      // برای ذخیره عکس در دیتابیس، از یک عکس فشرده شده یا لینک موقت استفاده می‌کنیم
       const { error } = await supabase.from('notes').insert([{
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
-        image_url: selectedImage,
+        image_url: selectedImage, // نکته: برای ذخیره دائمی عکس، در آینده باید از Supabase Storage استفاده کنیم
         category_id: noteCategory
       }]);
 
@@ -254,7 +279,6 @@ function App() {
 
       <main className="max-w-5xl mx-auto mt-8 px-4 pb-20">
         
-        {/* داشبورد */}
         {currentView === 'dashboard' && (
           <div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -304,7 +328,6 @@ function App() {
           </div>
         )}
 
-        {/* آپلود */}
         {currentView === 'upload' && (
           <div className="max-w-3xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -332,7 +355,7 @@ function App() {
                     <div className="flex gap-4">
                       <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md disabled:bg-gray-400">
                         {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                        {isExtracting ? 'در حال استخراج...' : 'استخراج متن با هوش مصنوعی'}
+                        {isExtracting ? 'در حال استخراج (فشرده‌سازی عکس)...' : 'استخراج متن با هوش مصنوعی'}
                       </button>
                     </div>
                   </div>
@@ -364,7 +387,6 @@ function App() {
           </div>
         )}
 
-        {/* جزئیات یادداشت */}
         {currentView === 'detail' && activeNote && (
           <div className="max-w-4xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
