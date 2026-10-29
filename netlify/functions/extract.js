@@ -11,14 +11,11 @@ export const handler = async (event, context) => {
       return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter در تنظیمات Netlify یافت نشد" }) };
     }
 
-    // پرامپت بسیار سخت‌گیرانه و دقیق برای ریاضیات و حذف مقدمه
-    const prompt = `شما یک موتور استخراج متن دقیق هستید. 
-متن دست‌نویس داخل تصویر را استخراج کنید. 
+    const prompt = `شما یک موتور استخراج متن دقیق هستید. متن دست‌نویس داخل تصویر را استخراج کنید. 
 قوانین بسیار مهم:
-1. هرگز هیچ مقدمه، خوش‌آمدگویی یا توضیح اضافه‌ای ننویسید. فقط و فقط متن داخل تصویر را برگردانید.
-2. تمام فرمول‌های ریاضی را با استاندارد LaTeX بنویسید. برای فرمول‌های بزرگ از $$...$$ و برای فرمول‌های درون‌خطی از $...$ استفاده کنید.
-3. هیچ کلمه‌ای را حدس نزنید. اگر ناخوانا بود بنویسید [نامشخص].
-4. ساختار لیست‌ها و پاراگراف‌ها را دقیقاً حفظ کنید.`;
+1. هرگز هیچ مقدمه یا توضیح اضافه‌ای ننویسید.
+2. فرمول‌های ریاضی را دقیقاً با LaTeX بنویسید (برای فرمول‌های بزرگ از $$...$$ و برای درون‌خطی از $...$).
+3. کلمات ناخوانا را [نامشخص] بگذارید.`;
     
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
 
@@ -29,7 +26,12 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "openrouter/free", // استفاده از روتر خودکار
+        // لیست مدل‌های پشتیبان (اگر اولی خطا داد، خودکار میره سراغ دومی و...)
+        models: [
+          "nvidia/nemotron-nano-12b-v2-vl:free",
+          "google/gemma-3-27b-it:free",
+          "meta-llama/llama-3.2-11b-vision-instruct:free"
+        ],
         messages: [
           {
             role: "user",
@@ -38,7 +40,8 @@ export const handler = async (event, context) => {
               { type: "image_url", image_url: { url: imageUrl } }
             ]
           }
-        ]
+        ],
+        max_tokens: 2000
       })
     });
 
