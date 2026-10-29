@@ -5,24 +5,34 @@ export const handler = async (event, context) => {
 
   try {
     const { imageBase64, mimeType } = JSON.parse(event.body);
-    const apiKey = process.env.VITE_GEMINI_API_KEY; 
+    // این خط برای OpenRouter تغییر کرده
+    const apiKey = process.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: "کلید API یافت نشد" }) };
+      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter یافت نشد" }) };
     }
 
     const prompt = "شما یک استاد دانشگاه هستید. متن دست‌نویس داخل این تصویر را با دقت استخراج کنید. غلط‌های املایی را اصلاح کنید. اگر کلمه‌ای ناخوانا بود، بنویسید [نامشخص]. فرمول‌های ریاضی را با LaTeX بنویسید.";
+    const imageUrl = `data:${mimeType};base64,${imageBase64}`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // اینجا به OpenRouter وصل میشیم
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: imageBase64 } }
-          ]
-        }]
+        model: "google/gemini-2.0-flash-exp:free",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: imageUrl } }
+            ]
+          }
+        ]
       })
     });
 
@@ -32,7 +42,7 @@ export const handler = async (event, context) => {
       return { statusCode: 400, body: JSON.stringify({ error: data.error.message }) };
     }
 
-    const extractedText = data.candidates[0].content.parts[0].text;
+    const extractedText = data.choices[0].message.content;
 
     return {
       statusCode: 200,
