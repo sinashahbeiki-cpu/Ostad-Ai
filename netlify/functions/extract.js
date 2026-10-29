@@ -8,7 +8,7 @@ export const handler = async (event, context) => {
     const apiKey = process.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter در تنظیمات Netlify یافت نشد" }) };
+      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter یافت نشد" }) };
     }
 
     const prompt = `شما یک موتور استخراج متن دقیق هستید. متن دست‌نویس داخل تصویر را استخراج کنید. 
@@ -26,11 +26,12 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        // لیست مدل‌های پشتیبان (اگر اولی خطا داد، خودکار میره سراغ دومی و...)
+        // لیست مدل‌های تصویری رایگان و پایدارتر (به ترتیب اولویت)
         models: [
-          "nvidia/nemotron-nano-12b-v2-vl:free",
-          "google/gemma-3-27b-it:free",
-          "meta-llama/llama-3.2-11b-vision-instruct:free"
+          "qwen/qwen-2.5-vl-7b-instruct:free",
+          "meta-llama/llama-3.2-11b-vision-instruct:free",
+          "microsoft/phi-3.5-vision-instruct:free",
+          "qwen/qwen-2-vl-7b-instruct:free"
         ],
         messages: [
           {
