@@ -1,33 +1,14 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { supabase } from './supabase'; // اتصال به دیتابیس
+import { supabase } from './supabase'; 
 
 const availableIcons = {
   BookOpen: <BookOpen className="w-6 h-6" />, Atom: <Atom className="w-6 h-6" />, Wrench: <Wrench className="w-6 h-6" />, FileText: <FileText className="w-6 h-6" />, Calculator: <Calculator className="w-6 h-6" />, FlaskConical: <FlaskConical className="w-6 h-6" />, Globe: <Globe className="w-6 h-6" />, Code: <Code className="w-6 h-6" />, Palette: <Palette className="w-6 h-6" />, Briefcase: <Briefcase className="w-6 h-6" />, Music: <Music className="w-6 h-6" />, ImageIcon: <ImageIcon className="w-6 h-6" />
 };
-
-const simulatedText = `
-## ۱. مقدمه‌ای بر جریان سیال در محیط متخلخل
-جریان سیال در محیط‌های متخلخل (مانند سنگ‌های مخزن نفت و گاز) یکی از مباحث بنیادین در مهندسی نفت است. هنری دارسی (Henry Darcy) در سال ۱۸۵۶ با انجام آزمایش‌هایی روی ستون‌های ماسه‌ای، قانونی را فرموله کرد که امروزه به **قانون دارسی** معروف است.
-
-## ۲. معادله اصلی دارسی
-بر اساس این قانون، دبی حجمی جریان سیال ($Q$) با گرادیان هد هیدرولیکی رابطه مستقیم دارد. معادله دیفرانسیلی و یک‌بعدی دارسی به شکل زیر است:
-
-$$ Q = - K A \\frac{dh}{dl} $$
-
-که در آن:
-*   **$Q$**: دبی حجمی (Volumetric flow rate) با واحد $\\left(\\frac{cm^3}{s}\\right)$
-*   **$K$**: نفوذپذیری یا هدایت هیدرولیکی (Hydraulic conductivity)
-*   **$A$**: سطح مقطع محیط متخلخل
-*   **$\\frac{dh}{dl}$**: گرادیان هیدرولیکی
-
-> **نکته مهندسی:** فرض اصلی در قانون دارسی، جریان آرام (Laminar flow) است. در سرعت‌های بالا و نزدیک به چاه، جریان ممکن است آشفته شده و قانون دارسی اعتبار خود را از دست بدهد.
-`;
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -47,7 +28,6 @@ function App() {
     ];
   });
 
-  // گرفتن یادداشت‌ها از دیتابیس Supabase
   const [notes, setNotes] = useState([]);
 
   useEffect(() => {
@@ -83,6 +63,7 @@ function App() {
   const [noteTitle, setNoteTitle] = useState('');
   const [noteCategory, setNoteCategory] = useState(categories[0]?.id || 'general');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const pdfRef = useRef();
 
   const handleBackToDashboard = () => {
@@ -92,6 +73,7 @@ function App() {
     setSelectedImage(null);
     setExtractedText('');
     setNoteTitle('');
+    setErrorMsg('');
   };
 
   const handleImageChange = (e) => {
@@ -100,17 +82,53 @@ function App() {
       setSelectedImage(URL.createObjectURL(file));
       setSelectedFile(file);
       setExtractedText('');
+      setErrorMsg('');
     }
   };
 
+  // تبدیل عکس به Base64 برای ارسال به سرور
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // اتصال به هوش مصنوعی از طریق Netlify Function
   const handleExtract = async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
+    
     setIsExtracting(true);
-    setTimeout(() => {
-      setExtractedText(simulatedText);
+    setErrorMsg('');
+
+    try {
+      const base64Data = await fileToBase64(selectedFile);
+      
+      const response = await fetch('/.netlify/functions/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          mimeType: selectedFile.type
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'خطا در ارتباط با هوش مصنوعی');
+      }
+
+      setExtractedText(data.text);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("خطا در استخراج متن. لطفا اتصال اینترنت را بررسی کنید. " + error.message);
+    } finally {
       setIsExtracting(false);
-    }, 1000);
+    }
   };
 
   const handleCopyText = () => {
@@ -119,7 +137,6 @@ function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // ذخیره یادداشت در Supabase
   const handleSaveNote = async (isNew = true) => {
     if (!extractedText.trim()) return;
     
@@ -147,11 +164,10 @@ function App() {
       }
     }
     
-    await fetchNotes(); // لیست را دوباره از دیتابیس می‌خوانیم
+    await fetchNotes();
     handleBackToDashboard();
   };
 
-  // حذف یادداشت از Supabase
   const handleDeleteNote = async (id, e) => {
     e.stopPropagation();
     if (window.confirm('آیا از حذف این یادداشت مطمئن هستید؟')) {
@@ -195,21 +211,17 @@ function App() {
     }, 500);
   };
 
-  const handleDownloadWord = () => {
-    alert("در نسخه نهایی، فایل Word دانلود خواهد شد. (شبیه‌سازی)");
-  };
-
-  const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
-
-  // تابع فرمت کردن تاریخ
   const formatDate = (dateString) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('fa-IR');
   };
 
+  const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
       
+      {/* مودال دسته بندی */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md">
@@ -242,6 +254,7 @@ function App() {
 
       <main className="max-w-5xl mx-auto mt-8 px-4 pb-20">
         
+        {/* داشبورد */}
         {currentView === 'dashboard' && (
           <div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -291,6 +304,7 @@ function App() {
           </div>
         )}
 
+        {/* آپلود */}
         {currentView === 'upload' && (
           <div className="max-w-3xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -316,9 +330,9 @@ function App() {
                   <div className="flex flex-col items-center">
                     <img src={selectedImage} className="max-h-64 object-contain rounded-lg mb-4 shadow-sm" />
                     <div className="flex gap-4">
-                      <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md">
+                      <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md disabled:bg-gray-400">
                         {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                        {isExtracting ? 'در حال پردازش...' : 'استخراج متن'}
+                        {isExtracting ? 'در حال استخراج...' : 'استخراج متن با هوش مصنوعی'}
                       </button>
                     </div>
                   </div>
@@ -330,11 +344,17 @@ function App() {
                   </div>
                 )}
               </div>
+              
+              {errorMsg && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl mt-4 text-center border border-red-100" dir="ltr">
+                  {errorMsg}
+                </div>
+              )}
             </div>
 
             {extractedText && (
               <div className="bg-white rounded-3xl shadow-sm border p-6 mb-6">
-                <h3 className="font-bold text-lg mb-4">متن استخراج شده (شبیه‌سازی)</h3>
+                <h3 className="font-bold text-lg mb-4">متن استخراج شده</h3>
                 <textarea value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="w-full h-64 p-4 bg-gray-50 border rounded-xl resize-none outline-none focus:ring-2 focus:ring-[#1E3A8A] text-gray-800 leading-relaxed mb-4" />
                 <button onClick={() => handleSaveNote(true)} className="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
                   <Save className="w-5 h-5" /> ذخیره یادداشت در دیتابیس
@@ -344,6 +364,7 @@ function App() {
           </div>
         )}
 
+        {/* جزئیات یادداشت */}
         {currentView === 'detail' && activeNote && (
           <div className="max-w-4xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -422,7 +443,7 @@ function App() {
             </div>
 
             <div className="flex gap-4 max-w-3xl mx-auto">
-              <button className="flex-1 bg-white text-gray-700 py-3 rounded-xl font-bold flex justify-center items-center gap-2 border border-gray-200 hover:bg-gray-50 shadow-sm" onClick={handleDownloadWord}>
+              <button className="flex-1 bg-white text-gray-700 py-3 rounded-xl font-bold flex justify-center items-center gap-2 border border-gray-200 hover:bg-gray-50 shadow-sm">
                 <FileDown className="w-5 h-5" /> خروجی Word
               </button>
               <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className="flex-1 bg-[#1E3A8A] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-blue-800 transition shadow-lg">
@@ -432,7 +453,7 @@ function App() {
             
             {viewMode === 'edit' && (
               <button onClick={() => handleSaveNote(false)} className="w-full mt-4 max-w-3xl mx-auto block bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
-                <Save className="w-5 h-5" /> ذخیره تغییرات در دیتابیس
+                <Save className="w-5 h-5" /> ذخیره تغییرات
               </button>
             )}
 
