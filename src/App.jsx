@@ -1,22 +1,21 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { supabase } from './supabase'; // اتصال به دیتابیس
 
 const availableIcons = {
   BookOpen: <BookOpen className="w-6 h-6" />, Atom: <Atom className="w-6 h-6" />, Wrench: <Wrench className="w-6 h-6" />, FileText: <FileText className="w-6 h-6" />, Calculator: <Calculator className="w-6 h-6" />, FlaskConical: <FlaskConical className="w-6 h-6" />, Globe: <Globe className="w-6 h-6" />, Code: <Code className="w-6 h-6" />, Palette: <Palette className="w-6 h-6" />, Briefcase: <Briefcase className="w-6 h-6" />, Music: <Music className="w-6 h-6" />, ImageIcon: <ImageIcon className="w-6 h-6" />
 };
 
-// متن شبیه‌سازی شده با موضوع مهندسی نفت (قانون دارسی)
 const simulatedText = `
 ## ۱. مقدمه‌ای بر جریان سیال در محیط متخلخل
-
 جریان سیال در محیط‌های متخلخل (مانند سنگ‌های مخزن نفت و گاز) یکی از مباحث بنیادین در مهندسی نفت است. هنری دارسی (Henry Darcy) در سال ۱۸۵۶ با انجام آزمایش‌هایی روی ستون‌های ماسه‌ای، قانونی را فرموله کرد که امروزه به **قانون دارسی** معروف است.
 
 ## ۲. معادله اصلی دارسی
-
 بر اساس این قانون، دبی حجمی جریان سیال ($Q$) با گرادیان هد هیدرولیکی رابطه مستقیم دارد. معادله دیفرانسیلی و یک‌بعدی دارسی به شکل زیر است:
 
 $$ Q = - K A \\frac{dh}{dl} $$
@@ -27,17 +26,7 @@ $$ Q = - K A \\frac{dh}{dl} $$
 *   **$A$**: سطح مقطع محیط متخلخل
 *   **$\\frac{dh}{dl}$**: گرادیان هیدرولیکی
 
-### ۲.۱. فرم انتگرالی معادله
-برای جریان شعاعی به سمت یک چاه (Well), معادله را می‌توان به فرم انتگرالی زیر نوشت:
-
-$$ Q = \\frac{2 \\pi K h (P_e - P_w)}{\\mu \\ln\\left(\\frac{r_e}{r_w}\\right)} $$
-
-در این رابطه، $P_e$ فشار در مرز مخزن، $P_w$ فشار کف چاه، و $\\mu$ گرانروی سیال است.
-
 > **نکته مهندسی:** فرض اصلی در قانون دارسی، جریان آرام (Laminar flow) است. در سرعت‌های بالا و نزدیک به چاه، جریان ممکن است آشفته شده و قانون دارسی اعتبار خود را از دست بدهد.
-
-## ۳. جمع‌بندی
-قانون دارسی پایه و اساس محاسبات جریان سیال در مخازن هیدروکربنی است و در نرم‌افزارهای شبیه‌سازی مخزن (Reservoir Simulation) به شدت مورد استفاده قرار می‌گیرد.
 `;
 
 function App() {
@@ -46,6 +35,7 @@ function App() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [viewMode, setViewMode] = useState('preview'); 
   const [isCopied, setIsCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [categories, setCategories] = useState(() => {
     const saved = localStorage.getItem('ostad_categories');
@@ -57,15 +47,31 @@ function App() {
     ];
   });
 
-  const [notes, setNotes] = useState(() => {
-    const saved = localStorage.getItem('ostad_notes');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // گرفتن یادداشت‌ها از دیتابیس Supabase
+  const [notes, setNotes] = useState([]);
 
   useEffect(() => {
     localStorage.setItem('ostad_categories', JSON.stringify(categories));
-    localStorage.setItem('ostad_notes', JSON.stringify(notes));
-  }, [categories, notes]);
+  }, [categories]);
+
+  const fetchNotes = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching notes:', error);
+    } else {
+      setNotes(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -113,32 +119,57 @@ function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleSaveNote = (isNew = true) => {
+  // ذخیره یادداشت در Supabase
+  const handleSaveNote = async (isNew = true) => {
     if (!extractedText.trim()) return;
     
     if (isNew) {
-      const newNote = {
-        id: Date.now().toString(),
+      const { error } = await supabase.from('notes').insert([{
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
-        image: selectedImage,
-        date: new Date().toLocaleDateString('fa-IR'),
-        categoryId: noteCategory
-      };
-      setNotes([newNote, ...notes]);
+        image_url: selectedImage,
+        category_id: noteCategory
+      }]);
+
+      if (error) {
+        alert("خطا در ذخیره‌سازی: " + error.message);
+        return;
+      }
     } else {
-      setNotes(notes.map(n => n.id === activeNote.id ? { ...n, text: extractedText, title: noteTitle } : n));
-      setActiveNote({ ...activeNote, text: extractedText, title: noteTitle });
+      const { error } = await supabase.from('notes').update({
+        title: noteTitle,
+        text: extractedText
+      }).eq('id', activeNote.id);
+
+      if (error) {
+        alert("خطا در ویرایش: " + error.message);
+        return;
+      }
     }
+    
+    await fetchNotes(); // لیست را دوباره از دیتابیس می‌خوانیم
     handleBackToDashboard();
+  };
+
+  // حذف یادداشت از Supabase
+  const handleDeleteNote = async (id, e) => {
+    e.stopPropagation();
+    if (window.confirm('آیا از حذف این یادداشت مطمئن هستید؟')) {
+      const { error } = await supabase.from('notes').delete().eq('id', id);
+      if (error) {
+        alert("خطا در حذف: " + error.message);
+      } else {
+        await fetchNotes();
+      }
+    }
   };
 
   const openNote = (note) => {
     setActiveNote(note);
     setNoteTitle(note.title);
     setExtractedText(note.text);
-    setSelectedImage(note.image);
-    setNoteCategory(note.categoryId);
+    setSelectedImage(note.image_url);
+    setNoteCategory(note.category_id);
     setViewMode('preview');
     setCurrentView('detail');
   };
@@ -168,7 +199,13 @@ function App() {
     alert("در نسخه نهایی، فایل Word دانلود خواهد شد. (شبیه‌سازی)");
   };
 
-  const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.categoryId === activeCategory);
+  const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
+
+  // تابع فرمت کردن تاریخ
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('fa-IR');
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
@@ -221,25 +258,36 @@ function App() {
               <span className="text-sm text-gray-500">{filteredNotes.length} مورد</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {filteredNotes.map((note) => (
-                <div key={note.id} className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition flex flex-col">
-                  <h3 className="font-bold text-xl text-gray-800 mb-4">{note.title}</h3>
-                  <div className="flex gap-2 mb-6">
-                    <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium"><Calendar className="w-3.5 h-3.5" /> {note.date}</span>
-                    <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium">{categories.find(c => c.id === note.categoryId)?.label || 'عمومی'}</span>
+            {isLoading ? (
+               <div className="flex justify-center items-center py-20">
+                 <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+               </div>
+            ) : filteredNotes.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-gray-100 p-16 flex flex-col items-center text-center shadow-sm">
+                <FileText className="w-12 h-12 text-gray-300 mb-4" />
+                <p className="text-gray-500 font-medium">هنوز یادداشتی در این دسته نساخته‌اید.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredNotes.map((note) => (
+                  <div key={note.id} className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition flex flex-col">
+                    <h3 className="font-bold text-xl text-gray-800 mb-4">{note.title}</h3>
+                    <div className="flex gap-2 mb-6">
+                      <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium"><Calendar className="w-3.5 h-3.5" /> {formatDate(note.created_at)}</span>
+                      <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium">{categories.find(c => c.id === note.category_id)?.label || 'عمومی'}</span>
+                    </div>
+                    <div className="border-t pt-4 flex justify-between items-center">
+                      <button onClick={() => openNote(note)} className="text-[#1E3A8A] font-bold flex items-center gap-2 hover:underline">
+                        <ArrowLeft className="w-4 h-4" /> باز کردن
+                      </button>
+                      <button onClick={(e) => handleDeleteNote(note.id, e)} className="text-gray-400 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="border-t pt-4 flex justify-between items-center">
-                    <button onClick={() => openNote(note)} className="text-[#1E3A8A] font-bold flex items-center gap-2 hover:underline">
-                      <ArrowLeft className="w-4 h-4" /> باز کردن
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); if(window.confirm('حذف شود؟')) setNotes(notes.filter(n => n.id !== note.id)) }} className="text-gray-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -253,7 +301,7 @@ function App() {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">عنوان یادداشت</label>
-                  <input type="text" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="مثلاً: قانون دارسی" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#1E3A8A]" />
+                  <input type="text" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="مثلاً: معادله دارسی" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#1E3A8A]" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">دسته‌بندی</label>
@@ -289,7 +337,7 @@ function App() {
                 <h3 className="font-bold text-lg mb-4">متن استخراج شده (شبیه‌سازی)</h3>
                 <textarea value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="w-full h-64 p-4 bg-gray-50 border rounded-xl resize-none outline-none focus:ring-2 focus:ring-[#1E3A8A] text-gray-800 leading-relaxed mb-4" />
                 <button onClick={() => handleSaveNote(true)} className="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
-                  <Save className="w-5 h-5" /> ذخیره یادداشت
+                  <Save className="w-5 h-5" /> ذخیره یادداشت در دیتابیس
                 </button>
               </div>
             )}
@@ -307,9 +355,9 @@ function App() {
               <p className="text-gray-500">تصاویر یادداشت</p>
             </div>
 
-            {activeNote.image && (
+            {activeNote.image_url && (
               <div className="bg-white p-4 rounded-3xl border shadow-sm mb-8 flex flex-col items-center max-w-3xl mx-auto">
-                <img src={activeNote.image} className="max-h-72 object-contain rounded-xl mb-4 w-full" alt="جزوه" />
+                <img src={activeNote.image_url} className="max-h-72 object-contain rounded-xl mb-4 w-full" alt="جزوه" />
                 <div className="flex gap-3 w-full justify-center">
                   <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-50"><Scissors className="w-4 h-4" /> برش نمودار</button>
                   <button className="flex-1 bg-blue-50 text-[#1E3A8A] py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100"><Search className="w-4 h-4" /> استخراج متن</button>
@@ -350,7 +398,7 @@ function App() {
                   <div className="border-b-2 border-gray-200 pb-4 mb-8 flex justify-between items-center">
                     <div>
                       <h2 className="text-2xl font-black text-gray-800">{activeNote.title}</h2>
-                      <p className="text-sm text-gray-500 mt-1">دسته‌بندی: {categories.find(c => c.id === activeNote.categoryId)?.label} | تاریخ: {activeNote.date}</p>
+                      <p className="text-sm text-gray-500 mt-1">دسته‌بندی: {categories.find(c => c.id === activeNote.category_id)?.label} | تاریخ: {formatDate(activeNote.created_at)}</p>
                     </div>
                     <div className="text-right">
                       <span className="font-bold text-[#1E3A8A] text-xl tracking-tight">Ostad<span className="text-blue-500">AI</span></span>
@@ -384,7 +432,7 @@ function App() {
             
             {viewMode === 'edit' && (
               <button onClick={() => handleSaveNote(false)} className="w-full mt-4 max-w-3xl mx-auto block bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
-                <Save className="w-5 h-5" /> ذخیره تغییرات
+                <Save className="w-5 h-5" /> ذخیره تغییرات در دیتابیس
               </button>
             )}
 
