@@ -86,7 +86,7 @@ function App() {
     }
   };
 
-  // 🔥 تابع جدید: فشرده‌سازی عکس و تبدیل به Base64 برای سرعت بالا
+  // تابع فشرده‌سازی عکس برای سرعت بالاتر
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -96,7 +96,7 @@ function App() {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200; // عرض حداکثر ۱۲۰۰ پیکسل (مناسب برای OCR)
+          const MAX_WIDTH = 1200; 
           const scaleSize = MAX_WIDTH / img.width;
           
           if (img.width <= MAX_WIDTH) {
@@ -110,7 +110,6 @@ function App() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           
-          // تبدیل به JPEG با کیفیت 80 درصد برای کاهش حجم
           const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
           resolve(base64);
         };
@@ -127,18 +126,24 @@ function App() {
     setIsExtracting(true);
     setErrorMsg('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // ۱۵ ثانیه تایم‌آوت
+
     try {
-      // استفاده از تابع فشرده‌ساز
       const base64Data = await fileToBase64(selectedFile);
       
-      const response = await fetch('/.netlify/functions/extract', {
+      // 🌟 تغییر مهم: آدرس برای Cloudflare Pages
+      const response = await fetch('/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: base64Data,
-          mimeType: 'image/jpeg' // چون فشرده کردیم، فرمتش JPEG میشه
-        })
+          mimeType: 'image/jpeg'
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -149,7 +154,11 @@ function App() {
       setExtractedText(data.text);
     } catch (error) {
       console.error(error);
-      setErrorMsg("خطا در استخراج متن. لطفا اینترنت را بررسی کنید. " + error.message);
+      if (error.name === 'AbortError') {
+        setErrorMsg("زمان درخواست به پایان رسید. سرورهای هوش مصنوعی شلوغ هستند، لطفا دوباره تلاش کنید.");
+      } else {
+        setErrorMsg("خطا در استخراج متن. " + error.message);
+      }
     } finally {
       setIsExtracting(false);
     }
@@ -165,11 +174,10 @@ function App() {
     if (!extractedText.trim()) return;
     
     if (isNew) {
-      // برای ذخیره عکس در دیتابیس، از یک عکس فشرده شده یا لینک موقت استفاده می‌کنیم
       const { error } = await supabase.from('notes').insert([{
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
-        image_url: selectedImage, // نکته: برای ذخیره دائمی عکس، در آینده باید از Supabase Storage استفاده کنیم
+        image_url: selectedImage, 
         category_id: noteCategory
       }]);
 
@@ -264,6 +272,7 @@ function App() {
         </div>
       )}
 
+      {/* هدر */}
       <header className="bg-white shadow-sm border-b py-3 px-6 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3 cursor-pointer" onClick={handleBackToDashboard}>
           <div className="w-10 h-10 bg-[#1E3A8A] text-white rounded-xl flex items-center justify-center shadow-md"><BookOpen className="w-6 h-6" /></div>
@@ -279,6 +288,7 @@ function App() {
 
       <main className="max-w-5xl mx-auto mt-8 px-4 pb-20">
         
+        {/* داشبورد */}
         {currentView === 'dashboard' && (
           <div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -328,6 +338,7 @@ function App() {
           </div>
         )}
 
+        {/* آپلود */}
         {currentView === 'upload' && (
           <div className="max-w-3xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -355,7 +366,7 @@ function App() {
                     <div className="flex gap-4">
                       <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md disabled:bg-gray-400">
                         {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                        {isExtracting ? 'در حال استخراج (فشرده‌سازی عکس)...' : 'استخراج متن با هوش مصنوعی'}
+                        {isExtracting ? 'در حال استخراج...' : 'استخراج متن با هوش مصنوعی'}
                       </button>
                     </div>
                   </div>
@@ -387,6 +398,7 @@ function App() {
           </div>
         )}
 
+        {/* جزئیات یادداشت */}
         {currentView === 'detail' && activeNote && (
           <div className="max-w-4xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
