@@ -5,17 +5,20 @@ export const handler = async (event, context) => {
 
   try {
     const { imageBase64, mimeType } = JSON.parse(event.body);
-    // این خط برای OpenRouter تغییر کرده
+    
+    // خواندن کلید از تنظیمات Netlify
     const apiKey = process.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter یافت نشد" }) };
+      return { statusCode: 500, body: JSON.stringify({ error: "کلید API در تنظیمات Netlify یافت نشد" }) };
     }
 
-    const prompt = "شما یک استاد دانشگاه هستید. متن دست‌نویس داخل این تصویر را با دقت استخراج کنید. غلط‌های املایی را اصلاح کنید. اگر کلمه‌ای ناخوانا بود، بنویسید [نامشخص]. فرمول‌های ریاضی را با LaTeX بنویسید.";
+    const prompt = "شما یک استاد دانشگاه هستید. متن دست‌نویس داخل این تصویر را با دقت استخراج کنید. غلط‌های املایی را اصلاح کنید و ساختار پاراگراف‌ها را مرتب کنید. اگر کلمه‌ای ناخوانا بود، به جای حدس زدن، بنویسید [نامشخص]. فرمول‌های ریاضی را حتما با LaTeX بنویسید.";
+    
+    // تبدیل عکس به فرمت قابل ارسال
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
 
-    // اینجا به OpenRouter وصل میشیم
+    // استفاده از یک مدل تصویری قدرتمند و رایگان
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: 'POST',
       headers: {
@@ -23,7 +26,7 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "qwen/qwen-2-vl-7b-instruct:free", 
         messages: [
           {
             role: "user",
@@ -38,6 +41,7 @@ export const handler = async (event, context) => {
 
     const data = await response.json();
 
+    // بررسی خطاهای احتمالی
     if (data.error) {
       return { statusCode: 400, body: JSON.stringify({ error: data.error.message }) };
     }
