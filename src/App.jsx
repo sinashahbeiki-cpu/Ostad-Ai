@@ -86,7 +86,6 @@ function App() {
     }
   };
 
-  // تابع فشرده‌سازی عکس برای سرعت بالاتر
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -127,12 +126,11 @@ function App() {
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // ۱۵ ثانیه تایم‌آوت
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
       const base64Data = await fileToBase64(selectedFile);
       
-      // 🌟 تغییر مهم: آدرس برای Cloudflare Pages
       const response = await fetch('/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,7 +143,13 @@ function App() {
 
       clearTimeout(timeoutId);
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error("پاسخ سرور نامعتبر بود. لطفا کلید API و تنظیمات کلودفلر را بررسی کنید.");
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'خطا در ارتباط با هوش مصنوعی');
@@ -155,9 +159,9 @@ function App() {
     } catch (error) {
       console.error(error);
       if (error.name === 'AbortError') {
-        setErrorMsg("زمان درخواست به پایان رسید. سرورهای هوش مصنوعی شلوغ هستند، لطفا دوباره تلاش کنید.");
+        setErrorMsg("زمان درخواست به پایان رسید (۲۰ ثانیه). سرورهای هوش مصنوعی شلوغ هستند.");
       } else {
-        setErrorMsg("خطا در استخراج متن. " + error.message);
+        setErrorMsg("خطا در استخراج متن: " + error.message);
       }
     } finally {
       setIsExtracting(false);
@@ -380,7 +384,7 @@ function App() {
               </div>
               
               {errorMsg && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl mt-4 text-center border border-red-100" dir="ltr">
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl mt-4 text-center border border-red-100" dir="rtl">
                   {errorMsg}
                 </div>
               )}

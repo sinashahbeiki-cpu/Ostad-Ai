@@ -1,25 +1,20 @@
-export const handler = async (event, context) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
-
+export async function onRequestPost(context) {
   try {
-    const { imageBase64, mimeType } = JSON.parse(event.body);
-    const apiKey = process.env.OPENROUTER_API_KEY; 
+    const { imageBase64, mimeType } = await context.request.json();
+    const apiKey = context.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter یافت نشد" }) };
+      return new Response(JSON.stringify({ error: "کلید OPENROUTER_API_KEY در تنظیمات کلودفلر یافت نشد" }), {
+        status: 500, headers: { "Content-Type": "application/json" }
+      });
     }
 
     const prompt = `شما یک موتور استخراج متن دقیق هستید. متن دست‌نویس داخل تصویر را استخراج کنید. 
-قوانین بسیار مهم:
-1. هرگز هیچ مقدمه یا توضیح اضافه‌ای ننویسید.
-2. فرمول‌های ریاضی را دقیقاً با LaTeX بنویسید.
-3. کلمات ناخوانا را [نامشخص] بگذارید.`;
+قوانین: 1. هیچ مقدمه‌ای ننویسید. 2. فرمول‌ها را با LaTeX بنویسید. 3. کلمات ناخوانا را [نامشخص] بگذارید.`;
     
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
-
-    // مدل‌های به‌روز و فعال (اکتبر ۲۰۲۶)
+    
+    // مدل‌های به‌روز و فعال
     const modelsToTry = [
       "google/gemma-4-31b-it:free",
       "google/gemma-4-26b-a4b-it:free",
@@ -38,15 +33,7 @@ export const handler = async (event, context) => {
           },
           body: JSON.stringify({
             model: modelName,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: prompt },
-                  { type: "image_url", image_url: { url: imageUrl } }
-                ]
-              }
-            ],
+            messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }],
             max_tokens: 2000
           })
         });
@@ -54,24 +41,24 @@ export const handler = async (event, context) => {
         const data = await response.json();
 
         if (!data.error && data.choices && data.choices.length > 0) {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ text: data.choices[0].message.content })
-          };
+          return new Response(JSON.stringify({ text: data.choices[0].message.content }), {
+            status: 200, headers: { "Content-Type": "application/json" }
+          });
         } else {
-          lastError = data.error ? data.error.message : "پاسخ نامعتبر از مدل";
+          lastError = data.error ? data.error.message : "پاسخ نامعتبر";
         }
       } catch (err) {
         lastError = err.message;
       }
     }
 
-    return { 
-      statusCode: 400, 
-      body: JSON.stringify({ error: `همه مدل‌ها با خطا مواجه شدند. آخرین خطا: ${lastError}` }) 
-    };
+    return new Response(JSON.stringify({ error: `خطا از سمت OpenRouter: ${lastError}` }), {
+      status: 400, headers: { "Content-Type": "application/json" }
+    });
 
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    return new Response(JSON.stringify({ error: `خطای داخلی سرور: ${error.message}` }), {
+      status: 500, headers: { "Content-Type": "application/json" }
+    });
   }
-};
+}
