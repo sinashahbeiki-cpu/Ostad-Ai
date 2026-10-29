@@ -26,12 +26,11 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        // لیست مدل‌های تصویری رایگان و پایدارتر (به ترتیب اولویت)
+        // دقیقا ۳ مدل برای رعایت قانون OpenRouter
         models: [
           "qwen/qwen-2.5-vl-7b-instruct:free",
           "meta-llama/llama-3.2-11b-vision-instruct:free",
-          "microsoft/phi-3.5-vision-instruct:free",
-          "qwen/qwen-2-vl-7b-instruct:free"
+          "nvidia/nemotron-nano-12b-v2-vl:free"
         ],
         messages: [
           {
