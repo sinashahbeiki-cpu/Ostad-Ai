@@ -10,7 +10,7 @@ export const handler = async (event, context) => {
     const apiKey = process.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: "کلید API در تنظیمات Netlify یافت نشد" }) };
+      return { statusCode: 500, body: JSON.stringify({ error: "کلید OpenRouter در تنظیمات Netlify یافت نشد" }) };
     }
 
     const prompt = "شما یک استاد دانشگاه هستید. متن دست‌نویس داخل این تصویر را با دقت استخراج کنید. غلط‌های املایی را اصلاح کنید و ساختار پاراگراف‌ها را مرتب کنید. اگر کلمه‌ای ناخوانا بود، به جای حدس زدن، بنویسید [نامشخص]. فرمول‌های ریاضی را حتما با LaTeX بنویسید.";
@@ -18,7 +18,7 @@ export const handler = async (event, context) => {
     // تبدیل عکس به فرمت قابل ارسال
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
 
-    // استفاده از یک مدل تصویری قدرتمند و رایگان
+    // استفاده از مدل جدید و فعال Qwen 2.5
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: 'POST',
       headers: {
@@ -26,7 +26,7 @@ export const handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "qwen/qwen-2-vl-7b-instruct:free", 
+        model: "qwen/qwen-2.5-vl-7b-instruct:free", 
         messages: [
           {
             role: "user",
