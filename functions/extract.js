@@ -14,12 +14,13 @@ export async function onRequestPost(context) {
     
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
     
-    // لیست مدل‌های تصویری رایگان (اگر یکی نبود، بعدی رو امتحان میکنه)
+    // ✅ لیست به‌روز شده (مدل‌های تصویری رایگان و فعال)
     const modelsToTry = [
-      "qwen/qwen-2.5-vl-72b-instruct:free",
-      "meta-llama/llama-3.2-11b-vision-instruct:free",
-      "microsoft/phi-3.5-vision-instruct:free",
-      "google/gemma-3-27b-it:free"
+      "google/gemma-4-26b-a4b-it:free",
+      "google/gemma-4-31b-it:free",
+      "nvidia/nemotron-nano-12b-v2-vl:free",
+      "inclusionai/ling-3.0-flash-vl:free",
+      "qwen/qwen3.8-27b:free"
     ];
 
     let lastError = null;
