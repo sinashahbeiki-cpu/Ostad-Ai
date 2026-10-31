@@ -174,22 +174,35 @@ function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  // 🌟 تغییر اصلی: ارسال درخواست ذخیره به Cloudflare (به جای اتصال مستقیم به دیتابیس)
   const handleSaveNote = async (isNew = true) => {
     if (!extractedText.trim()) return;
     
     if (isNew) {
-      const { error } = await supabase.from('notes').insert([{
-        title: noteTitle || 'یادداشت بدون عنوان',
-        text: extractedText,
-        image_url: selectedImage, 
-        category_id: noteCategory
-      }]);
+      try {
+        const response = await fetch('/saveNote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: noteTitle || 'یادداشت بدون عنوان',
+            text: extractedText,
+            image_url: selectedImage, 
+            category_id: noteCategory
+          })
+        });
 
-      if (error) {
-        alert("خطا در ذخیره‌سازی: " + error.message);
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert("خطا در ذخیره‌سازی: " + (data.error || 'مشکل در ارتباط با سرور'));
+          return;
+        }
+      } catch (err) {
+        alert("خطای شبکه در ذخیره‌سازی: " + err.message);
         return;
       }
     } else {
+      // برای ویرایش فعلا همان روش قبلی را نگه می‌داریم
       const { error } = await supabase.from('notes').update({
         title: noteTitle,
         text: extractedText
