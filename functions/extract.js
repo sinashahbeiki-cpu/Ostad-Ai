@@ -12,6 +12,7 @@ export async function onRequestPost(context) {
     const prompt = `شما یک موتور استخراج متن دقیق هستید. متن دست‌نویس داخل تصویر را استخراج کنید. 
 قوانین: 1. هیچ مقدمه‌ای ننویسید. 2. فرمول‌ها را با LaTeX بنویسید. 3. کلمات ناخوانا را [نامشخص] بگذارید.`;
 
+    // ✅ استفاده از مدل جدید و جایگزین: Llama 4 Scout
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: 'POST',
       headers: {
@@ -19,7 +20,7 @@ export async function onRequestPost(context) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.2-11b-vision-preview",
+        model: "meta-llama/llama-4-scout-17b-16e-instruct",
         messages: [
           {
             role: "user",
