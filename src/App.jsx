@@ -126,7 +126,7 @@ function App() {
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // افزایش به ۶۰ ثانیه
 
     try {
       const base64Data = await fileToBase64(selectedFile);
@@ -159,7 +159,7 @@ function App() {
     } catch (error) {
       console.error(error);
       if (error.name === 'AbortError') {
-        setErrorMsg("زمان درخواست به پایان رسید (۲۰ ثانیه). سرورهای هوش مصنوعی شلوغ هستند.");
+        setErrorMsg("زمان درخواست به پایان رسید (۶۰ ثانیه). سرورهای هوش مصنوعی شلوغ هستند.");
       } else {
         setErrorMsg("خطا در استخراج متن: " + error.message);
       }
@@ -174,58 +174,57 @@ function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // 🌟 تغییر اصلی: ارسال درخواست ذخیره به Cloudflare (به جای اتصال مستقیم به دیتابیس)
   const handleSaveNote = async (isNew = true) => {
     if (!extractedText.trim()) return;
     
-    if (isNew) {
-      try {
-        const response = await fetch('/saveNote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: noteTitle || 'یادداشت بدون عنوان',
-            text: extractedText,
-            image_url: selectedImage, 
-            category_id: noteCategory
-          })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert("خطا در ذخیره‌سازی: " + (data.error || 'مشکل در ارتباط با سرور'));
-          return;
-        }
-      } catch (err) {
-        alert("خطای شبکه در ذخیره‌سازی: " + err.message);
-        return;
-      }
-    } else {
-      // برای ویرایش فعلا همان روش قبلی را نگه می‌داریم
-      const { error } = await supabase.from('notes').update({
+    try {
+      const payload = isNew ? {
+        action: 'insert',
+        title: noteTitle || 'یادداشت بدون عنوان',
+        text: extractedText,
+        image_url: selectedImage, 
+        category_id: noteCategory
+      } : {
+        action: 'update',
+        id: activeNote.id,
         title: noteTitle,
         text: extractedText
-      }).eq('id', activeNote.id);
+      };
 
-      if (error) {
-        alert("خطا در ویرایش: " + error.message);
+      const response = await fetch('/manageNote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert("خطا در ذخیره‌سازی: " + (data.error || 'مشکل در ارتباط با سرور'));
         return;
       }
+      
+      await fetchNotes();
+      handleBackToDashboard();
+    } catch (err) {
+      alert("خطای شبکه: " + err.message);
     }
-    
-    await fetchNotes();
-    handleBackToDashboard();
   };
 
   const handleDeleteNote = async (id, e) => {
     e.stopPropagation();
     if (window.confirm('آیا از حذف این یادداشت مطمئن هستید؟')) {
-      const { error } = await supabase.from('notes').delete().eq('id', id);
-      if (error) {
-        alert("خطا در حذف: " + error.message);
-      } else {
+      try {
+        const response = await fetch('/manageNote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id })
+        });
+        
+        if (!response.ok) throw new Error("خطا در حذف");
         await fetchNotes();
+      } catch (err) {
+        alert(err.message);
       }
     }
   };
@@ -241,6 +240,11 @@ function App() {
   };
 
   const handleDownloadPDF = async () => {
+    if (viewMode === 'edit') {
+      alert("لطفا ابتدا از حالت ویرایش خارج شوید (روی پیش‌نمایش کلیک کنید) تا PDF ساخته شود.");
+      return;
+    }
+    
     setIsGeneratingPdf(true);
     setTimeout(async () => {
       try {
@@ -250,7 +254,8 @@ function App() {
           filename: `${activeNote?.title || 'Ostad-AI'}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['p', 'li', '.katex-display', 'table'] } // جلوگیری از بریده شدن فرمول‌ها
         };
         await html2pdf().set(opt).from(element).save();
       } catch (error) {
@@ -271,7 +276,6 @@ function App() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
       
-      {/* مودال دسته بندی */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md">
@@ -284,12 +288,14 @@ function App() {
                 ))}
               </div>
             </div>
-            <div className="p-6 bg-gray-50 text-left"><button onClick={() => { setCategories([...categories, {id: Date.now().toString(), label: newCatName, iconKey: newCatIcon}]); setIsCategoryModalOpen(false); setNewCatName(''); }} className="bg-[#1E3A8A] text-white px-6 py-2 rounded-xl font-bold">ذخیره</button></div>
+            <div className="p-6 bg-gray-50 text-left"><button onClick={() => { 
+              if(!newCatName.trim()) return;
+              setCategories([...categories, {id: Date.now().toString(), label: newCatName, iconKey: newCatIcon}]); setIsCategoryModalOpen(false); setNewCatName(''); 
+            }} className="bg-[#1E3A8A] text-white px-6 py-2 rounded-xl font-bold">ذخیره</button></div>
           </div>
         </div>
       )}
 
-      {/* هدر */}
       <header className="bg-white shadow-sm border-b py-3 px-6 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3 cursor-pointer" onClick={handleBackToDashboard}>
           <div className="w-10 h-10 bg-[#1E3A8A] text-white rounded-xl flex items-center justify-center shadow-md"><BookOpen className="w-6 h-6" /></div>
@@ -305,10 +311,15 @@ function App() {
 
       <main className="max-w-5xl mx-auto mt-8 px-4 pb-20">
         
-        {/* داشبورد */}
         {currentView === 'dashboard' && (
           <div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+              {/* دکمه همه */}
+              <div onClick={() => setActiveCategory('all')} className={`group relative flex flex-col items-center justify-center p-6 rounded-3xl cursor-pointer transition-all ${activeCategory === 'all' ? 'bg-[#1E3A8A] text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-100 hover:shadow-md'}`}>
+                  <div className={`${activeCategory === 'all' ? 'text-white' : 'text-[#1E3A8A]'} mb-3`}><FileText className="w-6 h-6" /></div>
+                  <span className="font-bold">همه</span>
+              </div>
+
               {categories.map((cat) => (
                 <div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`group relative flex flex-col items-center justify-center p-6 rounded-3xl cursor-pointer transition-all ${activeCategory === cat.id ? 'bg-[#1E3A8A] text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-100 hover:shadow-md'}`}>
                   <div className={`${activeCategory === cat.id ? 'text-white' : 'text-[#1E3A8A]'} mb-3`}>{availableIcons[cat.iconKey]}</div>
@@ -355,7 +366,6 @@ function App() {
           </div>
         )}
 
-        {/* آپلود */}
         {currentView === 'upload' && (
           <div className="max-w-3xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -383,7 +393,7 @@ function App() {
                     <div className="flex gap-4">
                       <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md disabled:bg-gray-400">
                         {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                        {isExtracting ? 'در حال استخراج...' : 'استخراج متن با هوش مصنوعی'}
+                        {isExtracting ? 'در حال استخراج (تا ۶۰ ثانیه)...' : 'استخراج متن با هوش مصنوعی'}
                       </button>
                     </div>
                   </div>
@@ -415,7 +425,6 @@ function App() {
           </div>
         )}
 
-        {/* جزئیات یادداشت */}
         {currentView === 'detail' && activeNote && (
           <div className="max-w-4xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
@@ -423,7 +432,16 @@ function App() {
             </button>
 
             <div className="text-center mb-6">
-              <h1 className="text-3xl font-black text-[#1E3A8A] mb-2">{activeNote.title}</h1>
+              {viewMode === 'edit' ? (
+                <input 
+                  type="text" 
+                  value={noteTitle} 
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  className="text-3xl font-black text-[#1E3A8A] mb-2 text-center w-full border-b-2 border-dashed border-gray-300 outline-none bg-transparent focus:border-blue-500"
+                />
+              ) : (
+                <h1 className="text-3xl font-black text-[#1E3A8A] mb-2">{activeNote.title}</h1>
+              )}
               <p className="text-gray-500">تصاویر یادداشت</p>
             </div>
 
@@ -477,17 +495,15 @@ function App() {
                     </div>
                   </div>
 
+                  {/* اصلاح جهت فرمول‌ها در متن راست‌چین */}
                   <div className="text-gray-800 leading-loose text-justify prose prose-lg max-w-none 
                     prose-headings:text-[#1E3A8A] prose-headings:font-bold 
                     prose-p:mb-4 prose-p:text-justify 
-                    prose-li:mb-2 prose-strong:text-gray-900">
+                    prose-li:mb-2 prose-strong:text-gray-900
+                    [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {extractedText}
                     </ReactMarkdown>
-                  </div>
-
-                  <div className="absolute bottom-6 left-0 w-full text-center text-xs text-gray-400">
-                    تولید شده توسط Ostad AI - دستیار هوشمند دانشجویان
                   </div>
                 </div>
               )}
