@@ -4,7 +4,7 @@ export async function onRequestPost(context) {
     const apiKey = context.env.OPENROUTER_API_KEY; 
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "کلید OPENROUTER_API_KEY در تنظیمات کلودفلر یافت نشد" }), {
+      return new Response(JSON.stringify({ error: "کلید API در کلودفلر یافت نشد" }), {
         status: 500, headers: { "Content-Type": "application/json" }
       });
     }
@@ -14,11 +14,12 @@ export async function onRequestPost(context) {
     
     const imageUrl = `data:${mimeType};base64,${imageBase64}`;
     
-    // مدل‌های به‌روز و فعال
+    // لیست مدل‌های تصویری رایگان (اگر یکی نبود، بعدی رو امتحان میکنه)
     const modelsToTry = [
-      "google/gemma-4-31b-it:free",
-      "google/gemma-4-26b-a4b-it:free",
-      "nvidia/nemotron-nano-12b-v2-vl:free"
+      "qwen/qwen-2.5-vl-72b-instruct:free",
+      "meta-llama/llama-3.2-11b-vision-instruct:free",
+      "microsoft/phi-3.5-vision-instruct:free",
+      "google/gemma-3-27b-it:free"
     ];
 
     let lastError = null;
@@ -52,12 +53,12 @@ export async function onRequestPost(context) {
       }
     }
 
-    return new Response(JSON.stringify({ error: `خطا از سمت OpenRouter: ${lastError}` }), {
+    return new Response(JSON.stringify({ error: `همه مدل‌ها خطا دادند: ${lastError}` }), {
       status: 400, headers: { "Content-Type": "application/json" }
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: `خطای داخلی سرور: ${error.message}` }), {
+    return new Response(JSON.stringify({ error: `خطای داخلی: ${error.message}` }), {
       status: 500, headers: { "Content-Type": "application/json" }
     });
   }
