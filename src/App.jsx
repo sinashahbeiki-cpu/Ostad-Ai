@@ -3,7 +3,6 @@ import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, Ar
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { supabase } from './supabase'; 
 
 const availableIcons = {
   BookOpen: <BookOpen className="w-6 h-6" />, Atom: <Atom className="w-6 h-6" />, Wrench: <Wrench className="w-6 h-6" />, FileText: <FileText className="w-6 h-6" />, Calculator: <Calculator className="w-6 h-6" />, FlaskConical: <FlaskConical className="w-6 h-6" />, Globe: <Globe className="w-6 h-6" />, Code: <Code className="w-6 h-6" />, Palette: <Palette className="w-6 h-6" />, Briefcase: <Briefcase className="w-6 h-6" />, Music: <Music className="w-6 h-6" />, ImageIcon: <ImageIcon className="w-6 h-6" />
@@ -33,19 +32,22 @@ function App() {
     localStorage.setItem('ostad_categories', JSON.stringify(categories));
   }, [categories]);
 
+  // 🌟 تغییر جدید: دریافت یادداشت‌ها از طریق سرور کلودفلر (بدون اتصال مستقیم به Supabase)
   const fetchNotes = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('notes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching notes:', error);
-    } else {
-      setNotes(data || []);
+    try {
+      const response = await fetch('/getNotes');
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data || []);
+      } else {
+        console.error('Error fetching notes from server');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -237,7 +239,6 @@ function App() {
     setCurrentView('detail');
   };
 
-  // 🌟 تغییر جدید: استفاده از موتور چاپ مرورگر برای PDF
   const handleDownloadPDF = () => {
     if (viewMode === 'edit') {
       alert("لطفا ابتدا از حالت ویرایش خارج شوید (روی پیش‌نمایش کلیک کنید) تا PDF ساخته شود.");
@@ -276,7 +277,7 @@ function App() {
         </div>
       )}
 
-      <header className="bg-white shadow-sm border-b py-3 px-6 flex justify-between items-center sticky top-0 z-50">
+      <header className="bg-white shadow-sm border-b py-3 px-6 flex justify-between items-center sticky top-0 z-50 print:hidden">
         <div className="flex items-center gap-3 cursor-pointer" onClick={handleBackToDashboard}>
           <div className="w-10 h-10 bg-[#1E3A8A] text-white rounded-xl flex items-center justify-center shadow-md"><BookOpen className="w-6 h-6" /></div>
           <div>
