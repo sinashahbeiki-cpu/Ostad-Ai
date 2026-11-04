@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -62,7 +61,6 @@ function App() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteCategory, setNoteCategory] = useState(categories[0]?.id || 'general');
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const pdfRef = useRef();
 
@@ -126,7 +124,7 @@ function App() {
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // افزایش به ۶۰ ثانیه
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       const base64Data = await fileToBase64(selectedFile);
@@ -239,31 +237,13 @@ function App() {
     setCurrentView('detail');
   };
 
-  const handleDownloadPDF = async () => {
+  // 🌟 تغییر جدید: استفاده از موتور چاپ مرورگر برای PDF
+  const handleDownloadPDF = () => {
     if (viewMode === 'edit') {
       alert("لطفا ابتدا از حالت ویرایش خارج شوید (روی پیش‌نمایش کلیک کنید) تا PDF ساخته شود.");
       return;
     }
-    
-    setIsGeneratingPdf(true);
-    setTimeout(async () => {
-      try {
-        const element = pdfRef.current;
-        const opt = {
-          margin: 0.5,
-          filename: `${activeNote?.title || 'Ostad-AI'}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'], avoid: ['p', 'li', '.katex-display', 'table'] } // جلوگیری از بریده شدن فرمول‌ها
-        };
-        await html2pdf().set(opt).from(element).save();
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsGeneratingPdf(false);
-      }
-    }, 500);
+    window.print();
   };
 
   const formatDate = (dateString) => {
@@ -314,7 +294,6 @@ function App() {
         {currentView === 'dashboard' && (
           <div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
-              {/* دکمه همه */}
               <div onClick={() => setActiveCategory('all')} className={`group relative flex flex-col items-center justify-center p-6 rounded-3xl cursor-pointer transition-all ${activeCategory === 'all' ? 'bg-[#1E3A8A] text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-100 hover:shadow-md'}`}>
                   <div className={`${activeCategory === 'all' ? 'text-white' : 'text-[#1E3A8A]'} mb-3`}><FileText className="w-6 h-6" /></div>
                   <span className="font-bold">همه</span>
@@ -427,11 +406,11 @@ function App() {
 
         {currentView === 'detail' && activeNote && (
           <div className="max-w-4xl mx-auto">
-            <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium">
+            <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium print:hidden">
               <ArrowRight className="w-5 h-5" /> بازگشت
             </button>
 
-            <div className="text-center mb-6">
+            <div className="text-center mb-6 print:hidden">
               {viewMode === 'edit' ? (
                 <input 
                   type="text" 
@@ -446,7 +425,7 @@ function App() {
             </div>
 
             {activeNote.image_url && (
-              <div className="bg-white p-4 rounded-3xl border shadow-sm mb-8 flex flex-col items-center max-w-3xl mx-auto">
+              <div className="bg-white p-4 rounded-3xl border shadow-sm mb-8 flex flex-col items-center max-w-3xl mx-auto print:hidden">
                 <img src={activeNote.image_url} className="max-h-72 object-contain rounded-xl mb-4 w-full" alt="جزوه" />
                 <div className="flex gap-3 w-full justify-center">
                   <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-50"><Scissors className="w-4 h-4" /> برش نمودار</button>
@@ -455,14 +434,14 @@ function App() {
               </div>
             )}
 
-            <div className="flex justify-between items-center mb-4 px-2 max-w-3xl mx-auto">
+            <div className="flex justify-between items-center mb-4 px-2 max-w-3xl mx-auto print:hidden">
               <h2 className="font-bold text-lg">پیش‌نمایش محصول نهایی</h2>
               <button onClick={handleCopyText} className="text-sm text-gray-500 flex items-center gap-1 hover:text-blue-600">
                 <Copy className="w-4 h-4" /> {isCopied ? 'کپی شد!' : 'کپی متن'}
               </button>
             </div>
 
-            <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 w-full max-w-xs mx-auto">
+            <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 w-full max-w-xs mx-auto print:hidden">
               <button onClick={() => setViewMode('preview')} className={`flex-1 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${viewMode === 'preview' ? 'bg-white text-[#1E3A8A] shadow-sm' : 'text-gray-500'}`}>
                  پیش‌نمایش
               </button>
@@ -471,7 +450,7 @@ function App() {
               </button>
             </div>
 
-            <div className="bg-[#e5e7eb] p-4 md:p-8 rounded-3xl shadow-inner max-w-3xl mx-auto mb-6">
+            <div className="bg-[#e5e7eb] p-4 md:p-8 rounded-3xl shadow-inner max-w-3xl mx-auto mb-6 print:bg-transparent print:p-0">
               {viewMode === 'edit' ? (
                 <textarea 
                   value={extractedText} 
@@ -481,9 +460,9 @@ function App() {
               ) : (
                 <div 
                   ref={pdfRef} 
-                  className="bg-white p-8 md:p-12 shadow-2xl rounded-sm min-h-[700px] relative overflow-hidden"
+                  className="bg-white p-8 md:p-12 shadow-2xl rounded-sm min-h-[700px] relative overflow-hidden print-area print:shadow-none print:min-h-0"
                 >
-                  <div className="absolute top-0 left-0 w-full h-2 bg-[#1E3A8A]"></div>
+                  <div className="absolute top-0 left-0 w-full h-2 bg-[#1E3A8A] print:hidden"></div>
                   
                   <div className="border-b-2 border-gray-200 pb-4 mb-8 flex justify-between items-center">
                     <div>
@@ -495,7 +474,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* اصلاح جهت فرمول‌ها در متن راست‌چین */}
                   <div className="text-gray-800 leading-loose text-justify prose prose-lg max-w-none 
                     prose-headings:text-[#1E3A8A] prose-headings:font-bold 
                     prose-p:mb-4 prose-p:text-justify 
@@ -509,17 +487,17 @@ function App() {
               )}
             </div>
 
-            <div className="flex gap-4 max-w-3xl mx-auto">
+            <div className="flex gap-4 max-w-3xl mx-auto print:hidden">
               <button className="flex-1 bg-white text-gray-700 py-3 rounded-xl font-bold flex justify-center items-center gap-2 border border-gray-200 hover:bg-gray-50 shadow-sm">
                 <FileDown className="w-5 h-5" /> خروجی Word
               </button>
-              <button onClick={handleDownloadPDF} disabled={isGeneratingPdf} className="flex-1 bg-[#1E3A8A] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-blue-800 transition shadow-lg">
-                {isGeneratingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />} دانلود PDF
+              <button onClick={handleDownloadPDF} className="flex-1 bg-[#1E3A8A] text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:bg-blue-800 transition shadow-lg">
+                <Download className="w-5 h-5" /> دانلود PDF
               </button>
             </div>
             
             {viewMode === 'edit' && (
-              <button onClick={() => handleSaveNote(false)} className="w-full mt-4 max-w-3xl mx-auto block bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
+              <button onClick={() => handleSaveNote(false)} className="w-full mt-4 max-w-3xl mx-auto block bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md print:hidden">
                 <Save className="w-5 h-5" /> ذخیره تغییرات
               </button>
             )}
