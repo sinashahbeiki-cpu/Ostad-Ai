@@ -1,7 +1,7 @@
 export async function onRequestPost(context) {
   try {
     const body = await context.request.json();
-    const { action, id, title, text } = body;
+    const { action, id, title, text, image_url, category_id } = body;
     
     const supabaseUrl = context.env.VITE_SUPABASE_URL;
     const supabaseKey = context.env.VITE_SUPABASE_ANON_KEY;
@@ -12,7 +12,7 @@ export async function onRequestPost(context) {
 
     let url = `${supabaseUrl}/rest/v1/notes`;
     let method = 'POST';
-    let payload = body; // برای حالت ذخیره جدید
+    let payload = null;
 
     if (action === 'update') {
       url += `?id=eq.${id}`;
@@ -21,7 +21,10 @@ export async function onRequestPost(context) {
     } else if (action === 'delete') {
       url += `?id=eq.${id}`;
       method = 'DELETE';
-      payload = undefined;
+    } else {
+      // حالت ذخیره جدید: فقط اطلاعات مورد نیاز رو می‌فرستیم (بدون action)
+      method = 'POST';
+      payload = { title, text, image_url, category_id }; 
     }
 
     const response = await fetch(url, {
