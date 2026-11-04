@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
       url += `?id=eq.${id}`;
       method = 'DELETE';
     } else {
-      // حالت ذخیره جدید: فقط اطلاعات مورد نیاز رو می‌فرستیم (بدون action)
+      // 🌟 اینجا فیلد action رو حذف کردیم تا دیتابیس ارور نده
       method = 'POST';
       payload = { title, text, image_url, category_id }; 
     }
