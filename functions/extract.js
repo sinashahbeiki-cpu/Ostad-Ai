@@ -7,17 +7,25 @@ export async function onRequestPost(context) {
       return new Response(JSON.stringify({ error: "کلید API یافت نشد" }), { status: 500 });
     }
 
-    // پرامپت بهینه: نه خیلی طولانی، نه خیلی خلاصه. با توضیح فرمول‌ها.
-    const systemPrompt = `You are an expert university professor creating high-quality, structured study notes from handwritten images.
-Your goal is to extract the text, deduplicate, and organize it into a clear, educational note with brief formula explanations.
+    // پرامپت اصلاح‌شده: بدون مقدمه، مفهومی و بسیار خلاصه
+    const systemPrompt = `You are an expert university professor writing concise, conceptual study notes from images.
+Your absolute priority is brevity, zero filler text, and clear structure.
 
-Strict Rules:
-1. Extraction & Deduplication: Extract the text accurately. If images show the same content (overlapping blackboard photos), merge them and remove duplicates.
-2. Structuring: Use Markdown headings, bullet points, and clear paragraphs.
-3. Formula Explanations (CRUCIAL): Do NOT just list formulas. Add a brief, precise explanation for the major formulas. Explain what the variables represent (e.g., "r is radius, h is height") and the logic of the steps (e.g., "Substituting the area of a cylinder A = 2πrh into the equation").
-4. Conciseness with Value: Keep it concise. DO NOT invent outside information or write long introductions. Just ensure the explanation is complete enough to understand the math.
-5. Math Formatting: Use standard LaTeX ($$...$$ for blocks, $...$ for inline).
-6. Output Language: Persian (Farsi).`;
+CRITICAL RULES:
+1. NO INTRODUCTIONS OR CONCLUSIONS: Do NOT write things like "Here is the extracted text", "I have analyzed the images", or "I hope this helps". START DIRECTLY with the first heading or formula. If you include any conversational filler, you fail the task.
+2. Extraction & Deduplication: Extract the text. If multiple images contain identical or overlapping content, merge them and remove duplicates.
+3. Conceptual Explanations (Short): Do NOT write long paragraphs. For major formulas, add ONLY ONE short sentence explaining the core concept or variables (e.g., "A is the cross-sectional area."). Keep it extremely brief.
+4. Formatting: Use Markdown (headings, bullet points). Use standard LaTeX ($$...$$ for blocks, $...$ for inline).
+5. Output Language: Persian (Farsi).
+
+Output example of what is EXPECTED:
+## معادله دارسی
+رابطه بین دبی و فشار:
+$$ Q = kA \frac{dp}{dr} $$
+در اینجا \( k \) نفوذپذیری و \( A \) سطح مقطع است.
+
+Output example of what is FORBIDDEN (Do NOT do this):
+"بفرمایید، من تصاویر شما را بررسی کردم. در این جزوه معادله دارسی آمده است که..."`;
 
     const imageContents = images.map(img => ({
       type: "image_url",
@@ -37,12 +45,12 @@ Strict Rules:
           { 
             role: "user", 
             content: [
-              { type: "text", text: "Here are the images. Extract, deduplicate, and format the text with brief formula explanations." },
+              { type: "text", text: "Extract and format these notes following the strict rules. No introductions, keep explanations conceptual and short." },
               ...imageContents
             ]
           }
         ],
-        temperature: 0.2, // دمای کمی بالاتر برای اینکه بتواند توضیح آموزشی بنویسد
+        temperature: 0.1, 
         max_tokens: 4096
       })
     });
