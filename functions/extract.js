@@ -7,18 +7,18 @@ export async function onRequestPost(context) {
       return new Response(JSON.stringify({ error: "کلید API یافت نشد" }), { status: 500 });
     }
 
-    // پرامپت فوق سخت‌گیرانه برای حذف تکرار و جلوگیری از طولانی شدن
-    const systemPrompt = `You are a strict and highly precise OCR engine.
-You are given multiple images. These images MIGHT be overlapping photos of the SAME blackboard, or different pages.
-Your strict rules:
-1. Extract ALL handwritten text and formulas.
-2. DEDUPLICATE: If images contain the same content (e.g., overlapping photos of one board), merge them and DO NOT repeat sentences.
-3. BE CONCISE: DO NOT add any explanations, introductions, or extra concepts. Only output what is actually written.
-4. Fix ONLY obvious spelling mistakes. Do NOT re-write or over-explain the professor's notes.
-5. Format using Markdown and standard LaTeX ($$...$$ for block math, $...$ for inline).
-6. Output language: Persian.`;
+    // پرامپت بهینه: نه خیلی طولانی، نه خیلی خلاصه. با توضیح فرمول‌ها.
+    const systemPrompt = `You are an expert university professor creating high-quality, structured study notes from handwritten images.
+Your goal is to extract the text, deduplicate, and organize it into a clear, educational note with brief formula explanations.
 
-    // آماده‌سازی آرایه عکس‌ها برای ارسال یکجا
+Strict Rules:
+1. Extraction & Deduplication: Extract the text accurately. If images show the same content (overlapping blackboard photos), merge them and remove duplicates.
+2. Structuring: Use Markdown headings, bullet points, and clear paragraphs.
+3. Formula Explanations (CRUCIAL): Do NOT just list formulas. Add a brief, precise explanation for the major formulas. Explain what the variables represent (e.g., "r is radius, h is height") and the logic of the steps (e.g., "Substituting the area of a cylinder A = 2πrh into the equation").
+4. Conciseness with Value: Keep it concise. DO NOT invent outside information or write long introductions. Just ensure the explanation is complete enough to understand the math.
+5. Math Formatting: Use standard LaTeX ($$...$$ for blocks, $...$ for inline).
+6. Output Language: Persian (Farsi).`;
+
     const imageContents = images.map(img => ({
       type: "image_url",
       image_url: { url: `data:${img.mimeType};base64,${img.imageBase64}` }
@@ -37,12 +37,12 @@ Your strict rules:
           { 
             role: "user", 
             content: [
-              { type: "text", text: "Here are the images. Extract, deduplicate, and format the text." },
-              ...imageContents // ارسال همه عکس‌ها در یک درخواست
+              { type: "text", text: "Here are the images. Extract, deduplicate, and format the text with brief formula explanations." },
+              ...imageContents
             ]
           }
         ],
-        temperature: 0.0, // دمای صفر برای اینکه حتی یک کلمه هم از خودش اضافه نکند
+        temperature: 0.2, // دمای کمی بالاتر برای اینکه بتواند توضیح آموزشی بنویسد
         max_tokens: 4096
       })
     });

@@ -76,11 +76,10 @@ function App() {
     setErrorMsg('');
   };
 
-  // پشتیبانی قطعی از انتخاب چند فایل
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      // محدودیت ۵ عکس برای جلوگیری از خطای حجم
+      // محدودیت ۵ عکس
       const limitedFiles = files.slice(0, 5); 
       setSelectedFiles(limitedFiles);
       const previews = limitedFiles.map(file => URL.createObjectURL(file));
@@ -369,6 +368,10 @@ function App() {
               <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center relative bg-gray-50 hover:bg-gray-100 transition">
                 {imagePreviews.length > 0 ? (
                   <div className="flex flex-col items-center">
+                    <div className="mb-4 bg-blue-100 text-blue-800 font-bold px-4 py-2 rounded-lg">
+                      {imagePreviews.length} عکس انتخاب شده است
+                    </div>
+                    
                     <div className="flex flex-wrap gap-2 justify-center mb-4">
                       {imagePreviews.map((src, idx) => (
                         <img key={idx} src={src} className="h-32 object-contain rounded-lg shadow-sm border" />
@@ -381,7 +384,6 @@ function App() {
                       </button>
                       <label className="cursor-pointer bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition">
                         تغییر عکس‌ها
-                        {/* 🌟 کلید multiple برای انتخاب چندتایی */}
                         <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
                       </label>
                     </div>
@@ -391,7 +393,8 @@ function App() {
                     {/* 🌟 کلید multiple برای انتخاب چندتایی */}
                     <input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Upload className="w-12 h-12 text-[#1E3A8A] mx-auto mb-3 opacity-50" />
-                    <p className="font-bold text-gray-700 text-lg">عکس‌های جزوه را انتخاب کنید (چندتایی)</p>
+                    <p className="font-bold text-gray-700 text-lg">عکس‌های جزوه را انتخاب کنید</p>
+                    <p className="text-sm text-gray-500 mt-2">برای انتخاب چند عکس، هنگام کلیک کلید Ctrl (در ویندوز) یا دکمه‌های لمسی طولانی (در موبایل) را نگه دارید.</p>
                   </div>
                 )}
               </div>
