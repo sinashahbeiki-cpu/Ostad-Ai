@@ -32,7 +32,6 @@ function App() {
     localStorage.setItem('ostad_categories', JSON.stringify(categories));
   }, [categories]);
 
-  // 🌟 تغییر جدید: دریافت یادداشت‌ها از طریق سرور کلودفلر (بدون اتصال مستقیم به Supabase)
   const fetchNotes = async () => {
     setIsLoading(true);
     try {
@@ -40,8 +39,6 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setNotes(data || []);
-      } else {
-        console.error('Error fetching notes from server');
       }
     } catch (error) {
       console.error('Network error:', error);
@@ -57,8 +54,11 @@ function App() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('BookOpen');
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
+  
+  // 🌟 تغییر جدید: آرایه‌ای برای نگهداری چند عکس
+  const [selectedFiles, setSelectedFiles] = useState([]); 
+  const [imagePreviews, setImagePreviews] = useState([]);
+  
   const [extractedText, setExtractedText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [noteTitle, setNoteTitle] = useState('');
@@ -70,17 +70,20 @@ function App() {
     setCurrentView('dashboard');
     setViewMode('preview');
     setActiveNote(null);
-    setSelectedImage(null);
+    setSelectedFiles([]);
+    setImagePreviews([]);
     setExtractedText('');
     setNoteTitle('');
     setErrorMsg('');
   };
 
+  // 🌟 تغییر جدید: پشتیبانی از انتخاب چند فایل
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedImage(URL.createObjectURL(file));
-      setSelectedFile(file);
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setSelectedFiles(files);
+      const previews = files.map(file => URL.createObjectURL(file));
+      setImagePreviews(previews);
       setExtractedText('');
       setErrorMsg('');
     }
@@ -110,7 +113,7 @@ function App() {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           
           const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-          resolve(base64);
+          resolve({ imageBase64: base64, mimeType: 'image/jpeg' });
         };
         img.onerror = (error) => reject(error);
       };
@@ -120,24 +123,22 @@ function App() {
 
   const handleExtract = async (e) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
     
     setIsExtracting(true);
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // افزایش تایم‌اوت برای چند عکس
 
     try {
-      const base64Data = await fileToBase64(selectedFile);
+      // تبدیل همه عکس‌ها به Base64
+      const processedImages = await Promise.all(selectedFiles.map(file => fileToBase64(file)));
       
       const response = await fetch('/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64Data,
-          mimeType: 'image/jpeg'
-        }),
+        body: JSON.stringify({ images: processedImages }), // ارسال آرایه
         signal: controller.signal
       });
 
@@ -148,7 +149,7 @@ function App() {
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        throw new Error("پاسخ سرور نامعتبر بود. لطفا کلید API و تنظیمات کلودفلر را بررسی کنید.");
+        throw new Error("پاسخ سرور نامعتبر بود.");
       }
 
       if (!response.ok) {
@@ -159,7 +160,7 @@ function App() {
     } catch (error) {
       console.error(error);
       if (error.name === 'AbortError') {
-        setErrorMsg("زمان درخواست به پایان رسید (۶۰ ثانیه). سرورهای هوش مصنوعی شلوغ هستند.");
+        setErrorMsg("زمان پردازش به پایان رسید (۹۰ ثانیه).");
       } else {
         setErrorMsg("خطا در استخراج متن: " + error.message);
       }
@@ -182,7 +183,7 @@ function App() {
         action: 'insert',
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
-        image_url: selectedImage, 
+        image_url: imagePreviews[0] || null, // برای سادگی فقط عکس اول را ذخیره میکنیم
         category_id: noteCategory
       } : {
         action: 'update',
@@ -233,7 +234,6 @@ function App() {
     setActiveNote(note);
     setNoteTitle(note.title);
     setExtractedText(note.text);
-    setSelectedImage(note.image_url);
     setNoteCategory(note.category_id);
     setViewMode('preview');
     setCurrentView('detail');
@@ -241,7 +241,7 @@ function App() {
 
   const handleDownloadPDF = () => {
     if (viewMode === 'edit') {
-      alert("لطفا ابتدا از حالت ویرایش خارج شوید (روی پیش‌نمایش کلیک کنید) تا PDF ساخته شود.");
+      alert("لطفا ابتدا از حالت ویرایش خارج شوید تا PDF ساخته شود.");
       return;
     }
     window.print();
@@ -367,21 +367,30 @@ function App() {
               </div>
 
               <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center relative bg-gray-50 hover:bg-gray-100 transition">
-                {selectedImage ? (
+                {imagePreviews.length > 0 ? (
                   <div className="flex flex-col items-center">
-                    <img src={selectedImage} className="max-h-64 object-contain rounded-lg mb-4 shadow-sm" />
+                    {/* نمایش پیش‌نمایش چند عکس */}
+                    <div className="flex flex-wrap gap-2 justify-center mb-4">
+                      {imagePreviews.map((src, idx) => (
+                        <img key={idx} src={src} className="h-32 object-contain rounded-lg shadow-sm border" />
+                      ))}
+                    </div>
                     <div className="flex gap-4">
                       <button onClick={handleExtract} disabled={isExtracting} className="bg-[#1E3A8A] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-md disabled:bg-gray-400">
                         {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                        {isExtracting ? 'در حال استخراج (تا ۶۰ ثانیه)...' : 'استخراج متن با هوش مصنوعی'}
+                        {isExtracting ? 'در حال استخراج صفحات...' : 'استخراج متن همه صفحات'}
                       </button>
+                      <label className="cursor-pointer bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition">
+                        تغییر عکس‌ها
+                        <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                      </label>
                     </div>
                   </div>
                 ) : (
                   <div className="relative py-10 cursor-pointer">
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Upload className="w-12 h-12 text-[#1E3A8A] mx-auto mb-3 opacity-50" />
-                    <p className="font-bold text-gray-700 text-lg">عکس جزوه را انتخاب کنید</p>
+                    <p className="font-bold text-gray-700 text-lg">عکس‌های جزوه را انتخاب کنید (چندتایی)</p>
                   </div>
                 )}
               </div>
@@ -425,16 +434,6 @@ function App() {
               <p className="text-gray-500">تصاویر یادداشت</p>
             </div>
 
-            {activeNote.image_url && (
-              <div className="bg-white p-4 rounded-3xl border shadow-sm mb-8 flex flex-col items-center max-w-3xl mx-auto print:hidden">
-                <img src={activeNote.image_url} className="max-h-72 object-contain rounded-xl mb-4 w-full" alt="جزوه" />
-                <div className="flex gap-3 w-full justify-center">
-                  <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-50"><Scissors className="w-4 h-4" /> برش نمودار</button>
-                  <button className="flex-1 bg-blue-50 text-[#1E3A8A] py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100"><Search className="w-4 h-4" /> استخراج متن</button>
-                </div>
-              </div>
-            )}
-
             <div className="flex justify-between items-center mb-4 px-2 max-w-3xl mx-auto print:hidden">
               <h2 className="font-bold text-lg">پیش‌نمایش محصول نهایی</h2>
               <button onClick={handleCopyText} className="text-sm text-gray-500 flex items-center gap-1 hover:text-blue-600">
@@ -461,7 +460,7 @@ function App() {
               ) : (
                 <div 
                   ref={pdfRef} 
-                  className="bg-white p-8 md:p-12 shadow-2xl rounded-sm min-h-[700px] relative overflow-hidden print-area print:shadow-none print:min-h-0"
+                  className="bg-white p-8 md:p-12 shadow-2xl rounded-sm min-h-[700px] relative border border-gray-200 print-area print:shadow-none print:border-none print:min-h-0 print:p-4"
                 >
                   <div className="absolute top-0 left-0 w-full h-2 bg-[#1E3A8A] print:hidden"></div>
                   
