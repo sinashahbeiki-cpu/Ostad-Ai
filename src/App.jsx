@@ -55,7 +55,6 @@ function App() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('BookOpen');
   
-  // 🌟 تغییر جدید: آرایه‌ای برای نگهداری چند عکس
   const [selectedFiles, setSelectedFiles] = useState([]); 
   const [imagePreviews, setImagePreviews] = useState([]);
   
@@ -77,12 +76,14 @@ function App() {
     setErrorMsg('');
   };
 
-  // 🌟 تغییر جدید: پشتیبانی از انتخاب چند فایل
+  // پشتیبانی قطعی از انتخاب چند فایل
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      setSelectedFiles(files);
-      const previews = files.map(file => URL.createObjectURL(file));
+      // محدودیت ۵ عکس برای جلوگیری از خطای حجم
+      const limitedFiles = files.slice(0, 5); 
+      setSelectedFiles(limitedFiles);
+      const previews = limitedFiles.map(file => URL.createObjectURL(file));
       setImagePreviews(previews);
       setExtractedText('');
       setErrorMsg('');
@@ -129,16 +130,15 @@ function App() {
     setErrorMsg('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // افزایش تایم‌اوت برای چند عکس
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
 
     try {
-      // تبدیل همه عکس‌ها به Base64
       const processedImages = await Promise.all(selectedFiles.map(file => fileToBase64(file)));
       
       const response = await fetch('/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images: processedImages }), // ارسال آرایه
+        body: JSON.stringify({ images: processedImages }), 
         signal: controller.signal
       });
 
@@ -183,7 +183,7 @@ function App() {
         action: 'insert',
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
-        image_url: imagePreviews[0] || null, // برای سادگی فقط عکس اول را ذخیره میکنیم
+        image_url: imagePreviews[0] || null, 
         category_id: noteCategory
       } : {
         action: 'update',
@@ -369,7 +369,6 @@ function App() {
               <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center relative bg-gray-50 hover:bg-gray-100 transition">
                 {imagePreviews.length > 0 ? (
                   <div className="flex flex-col items-center">
-                    {/* نمایش پیش‌نمایش چند عکس */}
                     <div className="flex flex-wrap gap-2 justify-center mb-4">
                       {imagePreviews.map((src, idx) => (
                         <img key={idx} src={src} className="h-32 object-contain rounded-lg shadow-sm border" />
@@ -382,12 +381,14 @@ function App() {
                       </button>
                       <label className="cursor-pointer bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition">
                         تغییر عکس‌ها
+                        {/* 🌟 کلید multiple برای انتخاب چندتایی */}
                         <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
                       </label>
                     </div>
                   </div>
                 ) : (
                   <div className="relative py-10 cursor-pointer">
+                    {/* 🌟 کلید multiple برای انتخاب چندتایی */}
                     <input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Upload className="w-12 h-12 text-[#1E3A8A] mx-auto mb-3 opacity-50" />
                     <p className="font-bold text-gray-700 text-lg">عکس‌های جزوه را انتخاب کنید (چندتایی)</p>
