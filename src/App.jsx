@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown, LogOut, Lock, Mail } from 'lucide-react';
+import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown, LogOut, Lock, Mail, Pencil } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -36,7 +36,6 @@ function App() {
 
   const [notes, setNotes] = useState([]);
 
-  // سیستم احراز هویت
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -75,10 +74,12 @@ function App() {
     if (session) fetchNotes();
   }, [session]);
 
+  // 🌟 استیت‌های مربوط به مدیریت دسته‌ها (اضافه کردن و ویرایش)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('BookOpen');
-  
+  const [editingCatId, setEditingCatId] = useState(null); // 🌟 برای تشخیص حالت ویرایش
+
   const [selectedFiles, setSelectedFiles] = useState([]); 
   const [imagePreviews, setImagePreviews] = useState([]);
   
@@ -123,6 +124,50 @@ function App() {
     setExtractedText('');
     setNoteTitle('');
     setErrorMsg('');
+  };
+
+  // 🌟 باز کردن مودال برای ویرایش دسته
+  const openEditCategory = (cat, e) => {
+    e.stopPropagation(); // جلوگیری از فیلتر شدن
+    setEditingCatId(cat.id);
+    setNewCatName(cat.label);
+    setNewCatIcon(cat.iconKey);
+    setIsCategoryModalOpen(true);
+  };
+
+  // 🌟 باز کردن مودال برای ساخت دسته جدید
+  const openNewCategory = () => {
+    setEditingCatId(null);
+    setNewCatName('');
+    setNewCatIcon('BookOpen');
+    setIsCategoryModalOpen(true);
+  };
+
+  // 🌟 ذخیره تغییرات (چه جدید چه ویرایش)
+  const handleSaveCategory = () => {
+    if(!newCatName.trim()) return;
+    
+    if (editingCatId) {
+      // حالت ویرایش
+      setCategories(categories.map(c => 
+        c.id === editingCatId ? { ...c, label: newCatName, iconKey: newCatIcon } : c
+      ));
+    } else {
+      // حالت ساخت جدید
+      setCategories([...categories, {id: Date.now().toString(), label: newCatName, iconKey: newCatIcon}]);
+    }
+    
+    setIsCategoryModalOpen(false); 
+    setNewCatName(''); 
+  };
+
+  // 🌟 حذف دسته
+  const handleDeleteCategory = (id, e) => {
+    e.stopPropagation();
+    if (window.confirm('آیا از حذف این دسته مطمئن هستید؟')) {
+      setCategories(categories.filter(c => c.id !== id));
+      if (activeCategory === id) setActiveCategory('all');
+    }
   };
 
   const handleImageChange = (e) => {
@@ -232,7 +277,7 @@ function App() {
         text: extractedText,
         image_url: imagePreviews[0] || null, 
         category_id: noteCategory,
-        user_id: session.user.id // 🌟 ارسال آیدی کاربر به بک‌اند
+        user_id: session.user.id
       } : {
         action: 'update',
         id: activeNote.id,
@@ -244,7 +289,7 @@ function App() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}` // 🌟 ارسال توکن
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify(payload)
       });
@@ -308,7 +353,6 @@ function App() {
 
   const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
 
-  // 🌟 صفحه لاگین
   if (!session) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4 font-sans" dir="rtl">
@@ -384,22 +428,25 @@ function App() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
       
+      {/* مودال دسته‌بندی (برای ساخت و ویرایش) */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md">
-            <div className="flex justify-between p-6 border-b"><h3 className="font-bold text-xl">دسته جدید</h3><button onClick={() => setIsCategoryModalOpen(false)}><X className="w-6 h-6"/></button></div>
+            <div className="flex justify-between p-6 border-b">
+              <h3 className="font-bold text-xl">{editingCatId ? 'ویرایش دسته' : 'دسته جدید'}</h3>
+              <button onClick={() => setIsCategoryModalOpen(false)}><X className="w-6 h-6"/></button>
+            </div>
             <div className="p-6">
-              <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="نام..." className="w-full border rounded-xl px-4 py-3 mb-6 outline-none" />
+              <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="نام دسته..." className="w-full border rounded-xl px-4 py-3 mb-6 outline-none" />
               <div className="grid grid-cols-4 gap-3">
                 {Object.keys(availableIcons).map((key) => (
-                  <button key={key} onClick={() => setNewCatIcon(key)} className={`p-3 rounded-xl border-2 ${newCatIcon === key ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-100 text-gray-400'}`}>{availableIcons[key]}</button>
+                  <button key={key} onClick={() => setNewCatIcon(key)} className={`p-3 rounded-xl border-2 flex justify-center ${newCatIcon === key ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-100 text-gray-400'}`}>{availableIcons[key]}</button>
                 ))}
               </div>
             </div>
-            <div className="p-6 bg-gray-50 text-left"><button onClick={() => { 
-              if(!newCatName.trim()) return;
-              setCategories([...categories, {id: Date.now().toString(), label: newCatName, iconKey: newCatIcon}]); setIsCategoryModalOpen(false); setNewCatName(''); 
-            }} className="bg-[#1E3A8A] text-white px-6 py-2 rounded-xl font-bold">ذخیره</button></div>
+            <div className="p-6 bg-gray-50 text-left">
+              <button onClick={handleSaveCategory} className="bg-[#1E3A8A] text-white px-6 py-2 rounded-xl font-bold">ذخیره</button>
+            </div>
           </div>
         </div>
       )}
@@ -426,18 +473,36 @@ function App() {
         
         {currentView === 'dashboard' && (
           <div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
               <div onClick={() => setActiveCategory('all')} className={`group relative flex flex-col items-center justify-center p-6 rounded-3xl cursor-pointer transition-all ${activeCategory === 'all' ? 'bg-[#1E3A8A] text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-100 hover:shadow-md'}`}>
                   <div className={`${activeCategory === 'all' ? 'text-white' : 'text-[#1E3A8A]'} mb-3`}><FileText className="w-6 h-6" /></div>
                   <span className="font-bold">همه</span>
               </div>
 
+              {/* 🌟 نمایش کارت‌های دسته با دکمه‌های ویرایش و حذف */}
               {categories.map((cat) => (
                 <div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`group relative flex flex-col items-center justify-center p-6 rounded-3xl cursor-pointer transition-all ${activeCategory === cat.id ? 'bg-[#1E3A8A] text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-100 hover:shadow-md'}`}>
+                  
+                  {/* دکمه‌های مدیریت (فقط موقع هاور دیده می‌شوند) */}
+                  <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => openEditCategory(cat, e)} className="bg-white/80 p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 shadow-sm">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={(e) => handleDeleteCategory(cat.id, e)} className="bg-white/80 p-1.5 rounded-lg text-red-500 hover:bg-red-50 shadow-sm">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
                   <div className={`${activeCategory === cat.id ? 'text-white' : 'text-[#1E3A8A]'} mb-3`}>{availableIcons[cat.iconKey]}</div>
                   <span className="font-bold">{cat.label}</span>
                 </div>
               ))}
+
+              {/* دکمه ساخت دسته جدید */}
+              <div onClick={openNewCategory} className="flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-500 hover:text-blue-500 cursor-pointer transition-all bg-white">
+                <Plus className="w-6 h-6 mb-3" />
+                <span className="font-bold">دسته جدید</span>
+              </div>
             </div>
 
             <div className="flex justify-between items-end mb-6">
