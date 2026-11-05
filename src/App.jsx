@@ -154,11 +154,9 @@ function App() {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
       if (quizPhase === 'conceptual') {
-        // رفتن به مرحله مسائل
         setQuizPhase('problem');
         setCurrentQuestionIndex(0);
       } else {
-        // پایان آزمون
         setIsQuizModalOpen(false);
         alert("تبریک! آزمون به پایان رسید.");
       }
@@ -195,7 +193,7 @@ function App() {
     }
   };
 
-  // ... (بقیه توابع مثل handleImageChange, handleExtract, handleSaveNote, handleDeleteNote, openNote, handleDownloadPDF بدون تغییر می‌مونن)
+  // توابع آپلود و ذخیره
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
@@ -307,7 +305,6 @@ function App() {
             </div>
             
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
-              {/* فاز ۱: انتخاب جزوات */}
               {quizPhase === 'select' && (
                 <div>
                   <h4 className="font-bold text-lg mb-4">کدام جزوات را می‌خواهی بخوانی؟</h4>
@@ -323,7 +320,6 @@ function App() {
                 </div>
               )}
 
-              {/* فاز ۲: در حال تولید */}
               {quizPhase === 'generating' && (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
@@ -331,7 +327,6 @@ function App() {
                 </div>
               )}
 
-              {/* فاز ۳: خلاصه */}
               {quizPhase === 'summary' && quizData && (
                 <div>
                   <div className="prose prose-lg max-w-none text-justify mb-8 [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
@@ -341,7 +336,6 @@ function App() {
                 </div>
               )}
 
-              {/* فاز ۴: سوالات مفهومی */}
               {quizPhase === 'conceptual' && quizData && (
                 <div>
                   <div className="flex justify-between items-center mb-6 text-sm font-bold text-gray-500">
@@ -362,7 +356,9 @@ function App() {
 
                       return (
                         <button key={idx} onClick={() => handleOptionSelect(idx)} disabled={showFeedback} className={btnClass}>
-                          {opt}
+                          <div className="prose max-w-none text-right [&_.katex-display]:!text-right [&_.katex-display]:!dir-ltr">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{opt}</ReactMarkdown>
+                          </div>
                         </button>
                       );
                     })}
@@ -383,7 +379,6 @@ function App() {
                 </div>
               )}
 
-              {/* فاز ۵: مسائل */}
               {quizPhase === 'problem' && quizData && (
                 <div>
                   <div className="flex justify-between items-center mb-6 text-sm font-bold text-gray-500">
@@ -393,7 +388,6 @@ function App() {
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.problem_questions[currentQuestionIndex].question}</ReactMarkdown>
                   </div>
 
-                  {/* آپلود عکس حل مسئله */}
                   {!showFeedback && (
                     <div className="mb-6 p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 text-center">
                       <p className="text-sm font-bold text-blue-800 mb-2">می‌خواهی استاد ای‌آی راه حل دست‌نویس تو را تصحیح کند؟</p>
@@ -422,7 +416,9 @@ function App() {
 
                       return (
                         <button key={idx} onClick={() => handleOptionSelect(idx)} disabled={showFeedback} className={btnClass}>
-                          {opt}
+                          <div className="prose max-w-none text-right [&_.katex-display]:!text-right [&_.katex-display]:!dir-ltr">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{opt}</ReactMarkdown>
+                          </div>
                         </button>
                       );
                     })}
@@ -447,7 +443,6 @@ function App() {
         </div>
       )}
 
-      {/* ... (مودال‌های دسته بندی مثل قبل) */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md">
@@ -504,7 +499,6 @@ function App() {
           </div>
         )}
 
-        {/* ... (بخش‌های upload و detail بدون تغییر باقی می‌مونن، برای جلوگیری از طولانی شدن کد حذفشون کردم، اما توی فایل اصلی باید همون‌طور که بود باشن) */}
         {currentView === 'upload' && (
           <div className="max-w-3xl mx-auto">
             <button onClick={handleBackToDashboard} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-6 font-medium"><ArrowRight className="w-5 h-5" /> بازگشت</button>
