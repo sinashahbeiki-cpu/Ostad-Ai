@@ -193,7 +193,6 @@ function App() {
     }
   };
 
-  // توابع آپلود و ذخیره
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
@@ -369,7 +368,9 @@ function App() {
                       <div className="flex items-center gap-2 mb-2 font-bold">
                         {selectedOption === quizData.conceptual_questions[currentQuestionIndex].correct_index ? <><CheckCircle className="w-5 h-5"/> پاسخ درست!</> : <><XCircle className="w-5 h-5"/> پاسخ اشتباه بود.</>}
                       </div>
-                      <p className="text-sm">{quizData.conceptual_questions[currentQuestionIndex].explanation}</p>
+                      <div className="text-sm prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.conceptual_questions[currentQuestionIndex].explanation}</ReactMarkdown>
+                      </div>
                     </div>
                   )}
 
@@ -398,7 +399,7 @@ function App() {
                       
                       {isGrading && <p className="mt-4 text-blue-600 font-medium animate-pulse">در حال بررسی راه حل شما...</p>}
                       {gradingFeedback && (
-                        <div className="mt-4 p-4 bg-white rounded-lg text-right text-sm text-gray-700 border border-blue-100 prose max-w-none">
+                        <div className="mt-4 p-4 bg-white rounded-lg text-right text-sm text-gray-700 border border-blue-100 prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
                           <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{gradingFeedback}</ReactMarkdown>
                         </div>
                       )}
@@ -429,7 +430,9 @@ function App() {
                       <div className="flex items-center gap-2 mb-2 font-bold">
                         {selectedOption === quizData.problem_questions[currentQuestionIndex].correct_index ? <><CheckCircle className="w-5 h-5"/> گزینه نهایی درست است!</> : <><XCircle className="w-5 h-5"/> گزینه نهایی اشتباه است.</>}
                       </div>
-                      <p className="text-sm">{quizData.problem_questions[currentQuestionIndex].explanation}</p>
+                      <div className="text-sm prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.problem_questions[currentQuestionIndex].explanation}</ReactMarkdown>
+                      </div>
                     </div>
                   )}
 
