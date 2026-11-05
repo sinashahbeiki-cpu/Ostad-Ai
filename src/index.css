@@ -16,3 +16,27 @@
     border: none !important;
   }
 }
+@media print {
+  /* جلوگیری از بریده شدن فرمول‌ها و کسرها */
+  .katex-display {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 1.5em 0 !important;
+  }
+  
+  .katex {
+    line-height: 1.5 !important;
+  }
+
+  /* جلوگیری از بریده شدن پاراگراف‌ها و لیست‌ها */
+  p, li, blockquote {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  /* باز کردن فضای کاغذ */
+  .prose {
+    max-width: none !important;
+    overflow: visible !important;
+  }
+}

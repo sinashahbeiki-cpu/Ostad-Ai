@@ -16,7 +16,8 @@ CRITICAL RULES:
 3. Extraction & Deduplication: Extract the text. If multiple images contain identical or overlapping content, merge them and remove duplicates.
 4. Conceptual Explanations (Short): Do NOT write long paragraphs. For major formulas, add ONLY ONE short sentence explaining the core concept or variables (e.g., "A is the cross-sectional area."). Keep it extremely brief.
 5. Formatting: Use Markdown (headings, bullet points). Use standard LaTeX ($$...$$ for blocks, $...$ for inline).
-6. Output Language: Persian (Farsi).`;
+6. Output Language: Persian (Farsi).
+7. CRITICAL: DO NOT REPEAT ANY TEXT OR FORMULAS. If a formula appears multiple times in the image, write it only ONCE. Do not loop.`;
 
     const imageContents = images.map(img => ({
       type: "image_url",
