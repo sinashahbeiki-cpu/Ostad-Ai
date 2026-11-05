@@ -1,14 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown } from 'lucide-react';
+import { BookOpen, Wrench, Atom, FileText, Plus, Upload, Loader2, ArrowRight, ArrowLeft, Calculator, FlaskConical, Globe, Code, Palette, Briefcase, Music, Image as ImageIcon, X, Download, Search, Edit, Save, Trash2, Calendar, Copy, Scissors, FileDown, LogOut, Lock, Mail } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { supabase } from './supabase';
 
 const availableIcons = {
   BookOpen: <BookOpen className="w-6 h-6" />, Atom: <Atom className="w-6 h-6" />, Wrench: <Wrench className="w-6 h-6" />, FileText: <FileText className="w-6 h-6" />, Calculator: <Calculator className="w-6 h-6" />, FlaskConical: <FlaskConical className="w-6 h-6" />, Globe: <Globe className="w-6 h-6" />, Code: <Code className="w-6 h-6" />, Palette: <Palette className="w-6 h-6" />, Briefcase: <Briefcase className="w-6 h-6" />, Music: <Music className="w-6 h-6" />, ImageIcon: <ImageIcon className="w-6 h-6" />
 };
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [currentView, setCurrentView] = useState('dashboard');
   const [activeNote, setActiveNote] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
@@ -28,14 +36,30 @@ function App() {
 
   const [notes, setNotes] = useState([]);
 
+  // سیستم احراز هویت
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('ostad_categories', JSON.stringify(categories));
   }, [categories]);
 
   const fetchNotes = async () => {
+    if (!session) return;
     setIsLoading(true);
     try {
-      const response = await fetch('/getNotes');
+      const response = await fetch('/getNotes', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
       if (response.ok) {
         const data = await response.json();
         setNotes(data || []);
@@ -48,8 +72,8 @@ function App() {
   };
 
   useEffect(() => {
-    fetchNotes();
-  }, []);
+    if (session) fetchNotes();
+  }, [session]);
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -65,6 +89,31 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const pdfRef = useRef();
 
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
+        if (error) throw error;
+        alert('ثبت‌نام موفق! حالا می‌توانید وارد شوید.');
+        setIsSignUp(false);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (error) throw error;
+      }
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setViewMode('preview');
@@ -79,7 +128,6 @@ function App() {
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      // محدودیت ۵ عکس
       const limitedFiles = files.slice(0, 5); 
       setSelectedFiles(limitedFiles);
       const previews = limitedFiles.map(file => URL.createObjectURL(file));
@@ -175,7 +223,7 @@ function App() {
   };
 
   const handleSaveNote = async (isNew = true) => {
-    if (!extractedText.trim()) return;
+    if (!extractedText.trim() || !session) return;
     
     try {
       const payload = isNew ? {
@@ -183,7 +231,8 @@ function App() {
         title: noteTitle || 'یادداشت بدون عنوان',
         text: extractedText,
         image_url: imagePreviews[0] || null, 
-        category_id: noteCategory
+        category_id: noteCategory,
+        user_id: session.user.id // 🌟 ارسال آیدی کاربر به بک‌اند
       } : {
         action: 'update',
         id: activeNote.id,
@@ -193,7 +242,10 @@ function App() {
 
       const response = await fetch('/manageNote', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}` // 🌟 ارسال توکن
+        },
         body: JSON.stringify(payload)
       });
 
@@ -217,7 +269,10 @@ function App() {
       try {
         const response = await fetch('/manageNote', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
           body: JSON.stringify({ action: 'delete', id })
         });
         
@@ -253,6 +308,79 @@ function App() {
 
   const filteredNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
 
+  // 🌟 صفحه لاگین
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4 font-sans" dir="rtl">
+        <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-[#1E3A8A] text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <BookOpen className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#1E3A8A]">Ostad<span className="text-blue-500">AI</span></h1>
+            <p className="text-gray-500 mt-2">دستیار هوشمند جزوه‌های دانشگاهی</p>
+          </div>
+
+          <h2 className="text-xl font-bold text-center mb-6">{isSignUp ? 'ایجاد حساب جدید' : 'ورود به حساب'}</h2>
+          
+          {authError && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-4 text-sm text-center border border-red-100">
+              {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">ایمیل</label>
+              <div className="relative">
+                <Mail className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                <input 
+                  type="email" 
+                  value={authEmail} 
+                  onChange={(e) => setAuthEmail(e.target.value)} 
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-10 outline-none focus:ring-2 focus:ring-[#1E3A8A]" 
+                  placeholder="you@example.com"
+                  required 
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">رمز عبور</label>
+              <div className="relative">
+                <Lock className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                <input 
+                  type="password" 
+                  value={authPassword} 
+                  onChange={(e) => setAuthPassword(e.target.value)} 
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-10 outline-none focus:ring-2 focus:ring-[#1E3A8A]" 
+                  placeholder="••••••••"
+                  required 
+                />
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              disabled={authLoading}
+              className="w-full bg-[#1E3A8A] text-white py-3.5 rounded-xl font-bold hover:bg-blue-800 transition shadow-md flex justify-center items-center gap-2 disabled:bg-gray-400"
+            >
+              {authLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              {isSignUp ? 'ثبت‌نام' : 'ورود'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button 
+              onClick={() => { setIsSignUp(!isSignUp); setAuthError(''); }} 
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {isSignUp ? 'قبلاً ثبت‌نام کرده‌اید؟ وارد شوید' : 'حساب کاربری ندارید؟ ثبت‌نام کنید'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
       
@@ -284,9 +412,14 @@ function App() {
             <p className="text-xs text-gray-500">دستیار هوشمند جزوه‌های دانشگاهی</p>
           </div>
         </div>
-        <button onClick={() => { handleBackToDashboard(); setCurrentView('upload'); }} className="bg-[#1E3A8A] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition shadow-md">
-          <Plus className="w-5 h-5" /> یادداشت جدید
-        </button>
+        <div className="flex items-center gap-4">
+          <button onClick={() => { handleBackToDashboard(); setCurrentView('upload'); }} className="bg-[#1E3A8A] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-800 transition shadow-md">
+            <Plus className="w-5 h-5" /> یادداشت جدید
+          </button>
+          <button onClick={handleLogout} className="text-gray-500 hover:text-red-500 flex items-center gap-1 text-sm font-medium transition">
+            <LogOut className="w-4 h-4" /> خروج
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto mt-8 px-4 pb-20">
@@ -390,11 +523,9 @@ function App() {
                   </div>
                 ) : (
                   <div className="relative py-10 cursor-pointer">
-                    {/* 🌟 کلید multiple برای انتخاب چندتایی */}
                     <input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Upload className="w-12 h-12 text-[#1E3A8A] mx-auto mb-3 opacity-50" />
                     <p className="font-bold text-gray-700 text-lg">عکس‌های جزوه را انتخاب کنید</p>
-                    <p className="text-sm text-gray-500 mt-2">برای انتخاب چند عکس، هنگام کلیک کلید Ctrl (در ویندوز) یا دکمه‌های لمسی طولانی (در موبایل) را نگه دارید.</p>
                   </div>
                 )}
               </div>
@@ -411,7 +542,7 @@ function App() {
                 <h3 className="font-bold text-lg mb-4">متن استخراج شده</h3>
                 <textarea value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="w-full h-64 p-4 bg-gray-50 border rounded-xl resize-none outline-none focus:ring-2 focus:ring-[#1E3A8A] text-gray-800 leading-relaxed mb-4" />
                 <button onClick={() => handleSaveNote(true)} className="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2 shadow-md">
-                  <Save className="w-5 h-5" /> ذخیره یادداشت در دیتابیس
+                  <Save className="w-5 h-5" /> ذخیره یادداشت در حساب کاربری
                 </button>
               </div>
             )}

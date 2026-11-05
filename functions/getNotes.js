@@ -1,17 +1,18 @@
 export async function onRequestGet(context) {
   try {
+    const authHeader = context.request.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
+
     const supabaseUrl = context.env.VITE_SUPABASE_URL;
     const supabaseKey = context.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      return new Response(JSON.stringify({ error: "تنظیمات دیتابیس یافت نشد" }), { status: 500 });
-    }
 
     const response = await fetch(`${supabaseUrl}/rest/v1/notes?select=*&order=created_at.desc`, {
       method: 'GET',
       headers: {
         'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
+        'Authorization': authHeader // استفاده از توکن کاربر به جای کلید عمومی
       }
     });
 

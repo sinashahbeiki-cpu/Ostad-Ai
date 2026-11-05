@@ -1,14 +1,15 @@
 export async function onRequestPost(context) {
   try {
+    const authHeader = context.request.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
+
     const body = await context.request.json();
-    const { action, id, title, text, image_url, category_id } = body;
+    const { action, id, title, text, image_url, category_id, user_id } = body;
     
     const supabaseUrl = context.env.VITE_SUPABASE_URL;
     const supabaseKey = context.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      return new Response(JSON.stringify({ error: "تنظیمات دیتابیس یافت نشد" }), { status: 500 });
-    }
 
     let url = `${supabaseUrl}/rest/v1/notes`;
     let method = 'POST';
@@ -22,16 +23,15 @@ export async function onRequestPost(context) {
       url += `?id=eq.${id}`;
       method = 'DELETE';
     } else {
-      // 🌟 اینجا فیلد action رو حذف کردیم تا دیتابیس ارور نده
       method = 'POST';
-      payload = { title, text, image_url, category_id }; 
+      payload = { title, text, image_url, category_id, user_id }; // حالا user_id هم ارسال میشه
     }
 
     const response = await fetch(url, {
       method: method,
       headers: {
         'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
+        'Authorization': authHeader, // توکن کاربر
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal'
       },
