@@ -41,19 +41,22 @@ export async function onRequestPost(context) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", // مدل قوی‌تر برای تولید JSON دقیق
+        model: "openai/gpt-oss-120b", // مدل جدید و فعال
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Here are the notes:\n\n${notesText}` }
         ],
         temperature: 0.2, 
         max_tokens: 4096,
-        response_format: { type: "json_object" } // مجبور کردن مدل به تولید JSON
+        response_format: { type: "json_object" } 
       })
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
+    
+    if (data.error) {
+      return new Response(JSON.stringify({ error: data.error.message }), { status: 400 });
+    }
 
     return new Response(data.choices[0].message.content, {
       status: 200, headers: { "Content-Type": "application/json" }
