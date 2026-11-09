@@ -1,7 +1,4 @@
 // functions/_utils/aiClient.js
-// لایه انتزاعی روی ارائه‌دهنده‌های AI.
-// وقتی به Liara مهاجرت کردیم، فقط این فایل تغییر می‌کند.
-
 const DEFAULT_TIMEOUT_MS = 60000;
 
 async function fetchWithTimeout(url, options, timeoutMs) {
@@ -15,24 +12,12 @@ async function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 export async function callGroq({
-  apiKey,
-  model,
-  messages,
-  temperature = 0.2,
-  maxTokens = 4096,
-  jsonMode = false,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
+  apiKey, model, messages, temperature = 0.2, maxTokens = 900, // کاهش به 900 برای رفع خطای OTPM
+  jsonMode = false, timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
-  if (!apiKey) {
-    return { ok: false, error: 'کلید API یافت نشد', status: 500 };
-  }
+  if (!apiKey) return { ok: false, error: 'کلید API یافت نشد', status: 500 };
 
-  const body = {
-    model,
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-  };
+  const body = { model, messages, temperature, max_tokens: maxTokens };
   if (jsonMode) body.response_format = { type: 'json_object' };
 
   try {
@@ -40,10 +25,7 @@ export async function callGroq({
       'https://api.groq.com/openai/v1/chat/completions',
       {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       },
       timeoutMs
@@ -52,26 +34,22 @@ export async function callGroq({
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || data.error) {
+      const isRateLimit = response.status === 429 || (data?.error?.message && data.error.message.includes('OTPM'));
       return {
         ok: false,
-        error: data?.error?.message || `خطای سرویس AI (HTTP ${response.status})`,
+        error: isRateLimit 
+          ? 'محدودیت پردازش در دقیقه (OTPM). لطفاً ۳۰ ثانیه صبر کنید و دوباره تلاش کنید.' 
+          : (data?.error?.message || `خطای سرویس AI (HTTP ${response.status})`),
         status: response.status >= 400 ? response.status : 502,
       };
     }
 
     const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-      return { ok: false, error: 'پاسخ خالی از سرویس AI', status: 502 };
-    }
+    if (!content) return { ok: false, error: 'پاسخ خالی از سرویس AI', status: 502 };
 
     return { ok: true, content, raw: data, error: null, status: 200 };
   } catch (err) {
-    if (err.name === 'AbortError') {
-      return { ok: false, error: 'زمان پردازش AI به پایان رسید', status: 504 };
-    }
+    if (err.name === 'AbortError') return { ok: false, error: 'زمان پردازش AI به پایان رسید', status: 504 };
     return { ok: false, error: `خطا در ارتباط با AI: ${err.message}`, status: 500 };
   }
 }
-
-// ─── برای آینده: مهاجرت به Liara / Metis / Ava ───
-// export async function callLiara({ apiKey, endpoint, model, messages, ... }) { ... }

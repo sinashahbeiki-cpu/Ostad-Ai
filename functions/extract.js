@@ -14,39 +14,27 @@ const SYSTEM_PROMPT = `You are an expert university professor writing concise, c
 
 export async function onRequestPost(context) {
   try {
-    // 1) احراز هویت
     const auth = await verifyAuth(context.request, context.env);
     if (!auth.user) return jsonResponse({ error: auth.error }, auth.status);
 
-    // 2) بدنه
     const { images } = await context.request.json();
-
-    // 3) اعتبارسنجی
     const validation = validateImages(images);
     if (!validation.ok) return jsonResponse({ error: validation.error }, validation.status);
 
-    // 4) ساخت پیام
     const imageContents = images.map(img => ({
       type: 'image_url',
       image_url: { url: `data:${img.mimeType};base64,${img.imageBase64}` },
     }));
 
-    // 5) فراخوانی AI
     const ai = await callGroq({
       apiKey: context.env.GROQ_API_KEY,
       model: 'qwen/qwen3.8-27b',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Extract and format these notes.' },
-            ...imageContents,
-          ],
-        },
+        { role: 'user', content: [{ type: 'text', text: 'Extract and format these notes.' }, ...imageContents] },
       ],
       temperature: 0.2,
-      maxTokens: 4096,
+      maxTokens: 900, // 💡 رفع خطای OTPM
       timeoutMs: 90000,
     });
 
