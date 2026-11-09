@@ -1,17 +1,20 @@
+
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
 @media print {
-  /* مخفی کردن المان‌های غیرضروری مثل منوها و دکمه‌ها */
+  /* مخفی کردن تمام عناصر غیرضروری */
   body * {
     visibility: hidden;
   }
-  
-  /* فقط کادر برگه جزوه را نشان بده */
-  .print-area, .print-area * {
+
+  /* نمایش فقط محتوای جزوه */
+  .print-area,
+  .print-area * {
     visibility: visible;
   }
-  
+
+  /* تنظیم صفحه چاپ */
   .print-area {
     position: absolute;
     left: 0;
@@ -22,27 +25,28 @@
     padding: 0 !important;
   }
 
-  /* 🌟 جادوی اصلی برای فرمول‌ها 🌟 */
-  .katex {
-    /* ایزوله کردن کامل فرمول‌ها تا جهت متن فارسی خرابشون نکنه */
+  /*
+   * ایزوله‌سازی جهت فرمول‌ها
+   * بدون تغییر display و line-height اصلی KaTeX
+   */
+  .print-area .katex {
+    direction: ltr !important;
     unicode-bidi: isolate !important;
-    /* جلوگیری از کشیده شدن خط کسر روی متن */
-    display: inline-block !important;
-    line-height: 1.2 !important;
   }
 
-  .katex-display {
-    /* فرمول‌های بزرگ (وسط خط) باید یک بلوک مستقل باشند */
+  /* فرمول‌های مستقل */
+  .print-area .katex-display {
     display: block !important;
-    text-align: left !important;
     direction: ltr !important;
+    text-align: left !important;
     unicode-bidi: isolate !important;
     margin: 1.5em 0 !important;
     page-break-inside: avoid !important;
   }
 
-  /* افزایش فاصله خطوط متن فارسی که روی فرمول نیفتد */
-  p, li {
+  /* خوانایی متن فارسی در چاپ */
+  .print-area p,
+  .print-area li {
     line-height: 1.8 !important;
   }
 }
