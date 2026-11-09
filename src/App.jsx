@@ -5,6 +5,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { supabase } from './supabase';
 
+// 🌟 کلاس‌های سخت‌گیرانه برای جلوگیری از به هم ریختن فرمول‌ها و خط کسر
+const strictMathClasses = "prose prose-lg max-w-none text-justify [&_.katex]:!inline-block [&_.katex]:!dir-ltr [&_.katex]:!unicode-bidi-isolate [&_.katex-display]:!block [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr [&_.katex-display]:!my-4 [&_.katex-display]:!w-full overflow-x-auto";
+
 const availableIcons = {
   BookOpen: <BookOpen className="w-6 h-6" />, Atom: <Atom className="w-6 h-6" />, Wrench: <Wrench className="w-6 h-6" />, FileText: <FileText className="w-6 h-6" />, Calculator: <Calculator className="w-6 h-6" />, FlaskConical: <FlaskConical className="w-6 h-6" />, Globe: <Globe className="w-6 h-6" />, Code: <Code className="w-6 h-6" />, Palette: <Palette className="w-6 h-6" />, Briefcase: <Briefcase className="w-6 h-6" />, Music: <Music className="w-6 h-6" />, ImageIcon: <ImageIcon className="w-6 h-6" />
 };
@@ -36,16 +39,16 @@ function App() {
 
   const [notes, setNotes] = useState([]);
 
-  // 🌟 استیت‌های سیستم آزمون و آموزش
+  // استیت‌های سیستم آزمون
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
-  const [quizPhase, setQuizPhase] = useState('select'); // 'select' | 'generating' | 'summary' | 'conceptual' | 'problem'
+  const [quizPhase, setQuizPhase] = useState('select'); 
   const [selectedNotesForQuiz, setSelectedNotesForQuiz] = useState([]);
   const [quizData, setQuizData] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   
-  // برای تصحیح عکس مسئله
+  // تصحیح عکس
   const [solutionImage, setSolutionImage] = useState(null);
   const [isGrading, setIsGrading] = useState(false);
   const [gradingFeedback, setGradingFeedback] = useState(null);
@@ -66,6 +69,7 @@ function App() {
   const pdfRef = useRef();
 
   useEffect(() => {
+    // امنیت: بررسی نشست کاربر در لود اولیه
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); });
     return () => subscription.unsubscribe();
@@ -77,21 +81,28 @@ function App() {
     if (!session) return;
     setIsLoading(true);
     try {
+      // امنیت: ارسال توکن به جای کلید عمومی
       const response = await fetch('/getNotes', { headers: { 'Authorization': `Bearer ${session.access_token}` } });
       if (response.ok) { const data = await response.json(); setNotes(data || []); }
-    } catch (error) { console.error('Network error:', error); } finally { setIsLoading(false); }
+    } catch (error) { console.error('Network error'); } finally { setIsLoading(false); }
   };
 
   useEffect(() => { if (session) fetchNotes(); }, [session]);
 
   const handleAuth = async (e) => {
-    e.preventDefault(); setAuthLoading(true); setAuthError('');
+    e.preventDefault(); 
+    setAuthLoading(true); 
+    setAuthError('');
     try {
+      // امنیت: Trim کردن ورودی‌ها برای جلوگیری از حملات فاصله
+      const cleanEmail = authEmail.trim();
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword });
-        if (error) throw error; alert('ثبت‌نام موفق!'); setIsSignUp(false);
+        const { error } = await supabase.auth.signUp({ email: cleanEmail, password: authPassword });
+        if (error) throw error; 
+        alert('ثبت‌نام موفق!'); 
+        setIsSignUp(false);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword });
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: authPassword });
         if (error) throw error;
       }
     } catch (error) { setAuthError(error.message); } finally { setAuthLoading(false); }
@@ -103,7 +114,6 @@ function App() {
     setCurrentView('dashboard'); setViewMode('preview'); setActiveNote(null); setSelectedFiles([]); setImagePreviews([]); setExtractedText(''); setNoteTitle(''); setErrorMsg('');
   };
 
-  // 🌟 توابع آزمون
   const openQuizModal = () => {
     const currentNotes = activeCategory === 'all' ? notes : notes.filter(n => n.category_id === activeCategory);
     setSelectedNotesForQuiz(currentNotes.map(n => n.id));
@@ -166,6 +176,11 @@ function App() {
   const handleGradeImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // امنیت: بررسی حجم فایل برای جلوگیری از کرش
+    if (file.size > 10 * 1024 * 1024) {
+      alert("حجم عکس راه حل نباید بیشتر از ۱۰ مگابایت باشد.");
+      return;
+    }
     setSolutionImage(URL.createObjectURL(file));
     setIsGrading(true);
     setGradingFeedback(null);
@@ -195,6 +210,11 @@ function App() {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
+    // امنیت: محدودیت تعداد و حجم فایل
+    if (files.some(f => f.size > 15 * 1024 * 1024)) {
+      setErrorMsg("حجم هر عکس نباید بیشتر از ۱۵ مگابایت باشد.");
+      return;
+    }
     if (files.length > 0) {
       const limitedFiles = files.slice(0, 5); 
       setSelectedFiles(limitedFiles);
@@ -247,8 +267,8 @@ function App() {
   const handleSaveNote = async (isNew = true) => {
     if (!extractedText.trim() || !session) return;
     try {
-      const payload = isNew ? { action: 'insert', title: noteTitle || 'یادداشت', text: extractedText, image_url: imagePreviews[0] || null, category_id: noteCategory, user_id: session.user.id } 
-                           : { action: 'update', id: activeNote.id, title: noteTitle, text: extractedText };
+      const payload = isNew ? { action: 'insert', title: noteTitle.trim() || 'یادداشت', text: extractedText, image_url: imagePreviews[0] || null, category_id: noteCategory, user_id: session.user.id } 
+                           : { action: 'update', id: activeNote.id, title: noteTitle.trim(), text: extractedText };
       const response = await fetch('/manageNote', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }, body: JSON.stringify(payload)
       });
@@ -294,7 +314,6 @@ function App() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-800" dir="rtl">
       
-      {/* 🌟 مودال آزمون و آموزش */}
       {isQuizModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -328,7 +347,7 @@ function App() {
 
               {quizPhase === 'summary' && quizData && (
                 <div>
-                  <div className="prose prose-lg max-w-none text-justify mb-8 [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                  <div className={`${strictMathClasses} mb-8`}>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.summary}</ReactMarkdown>
                   </div>
                   <button onClick={() => { setQuizPhase('conceptual'); setCurrentQuestionIndex(0); }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">شروع تست‌های مفهومی</button>
@@ -340,7 +359,7 @@ function App() {
                   <div className="flex justify-between items-center mb-6 text-sm font-bold text-gray-500">
                     <span>سوال مفهومی {currentQuestionIndex + 1} از {quizData.conceptual_questions.length}</span>
                   </div>
-                  <div className="text-xl font-bold mb-6 prose max-w-none">
+                  <div className={`${strictMathClasses} text-xl font-bold mb-6`}>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.conceptual_questions[currentQuestionIndex].question}</ReactMarkdown>
                   </div>
                   
@@ -355,7 +374,7 @@ function App() {
 
                       return (
                         <button key={idx} onClick={() => handleOptionSelect(idx)} disabled={showFeedback} className={btnClass}>
-                          <div className="prose max-w-none text-right [&_.katex-display]:!text-right [&_.katex-display]:!dir-ltr">
+                          <div className={`${strictMathClasses} text-base`}>
                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{opt}</ReactMarkdown>
                           </div>
                         </button>
@@ -368,7 +387,7 @@ function App() {
                       <div className="flex items-center gap-2 mb-2 font-bold">
                         {selectedOption === quizData.conceptual_questions[currentQuestionIndex].correct_index ? <><CheckCircle className="w-5 h-5"/> پاسخ درست!</> : <><XCircle className="w-5 h-5"/> پاسخ اشتباه بود.</>}
                       </div>
-                      <div className="text-sm prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                      <div className={`${strictMathClasses} text-sm`}>
                         <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.conceptual_questions[currentQuestionIndex].explanation}</ReactMarkdown>
                       </div>
                     </div>
@@ -385,7 +404,7 @@ function App() {
                   <div className="flex justify-between items-center mb-6 text-sm font-bold text-gray-500">
                     <span>مسئله {currentQuestionIndex + 1} از {quizData.problem_questions.length}</span>
                   </div>
-                  <div className="text-xl font-bold mb-6 prose max-w-none">
+                  <div className={`${strictMathClasses} text-xl font-bold mb-6`}>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.problem_questions[currentQuestionIndex].question}</ReactMarkdown>
                   </div>
 
@@ -399,7 +418,7 @@ function App() {
                       
                       {isGrading && <p className="mt-4 text-blue-600 font-medium animate-pulse">در حال بررسی راه حل شما...</p>}
                       {gradingFeedback && (
-                        <div className="mt-4 p-4 bg-white rounded-lg text-right text-sm text-gray-700 border border-blue-100 prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                        <div className={`${strictMathClasses} mt-4 p-4 bg-white rounded-lg text-right text-sm text-gray-700 border border-blue-100`}>
                           <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{gradingFeedback}</ReactMarkdown>
                         </div>
                       )}
@@ -417,7 +436,7 @@ function App() {
 
                       return (
                         <button key={idx} onClick={() => handleOptionSelect(idx)} disabled={showFeedback} className={btnClass}>
-                          <div className="prose max-w-none text-right [&_.katex-display]:!text-right [&_.katex-display]:!dir-ltr">
+                          <div className={`${strictMathClasses} text-base`}>
                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{opt}</ReactMarkdown>
                           </div>
                         </button>
@@ -430,7 +449,7 @@ function App() {
                       <div className="flex items-center gap-2 mb-2 font-bold">
                         {selectedOption === quizData.problem_questions[currentQuestionIndex].correct_index ? <><CheckCircle className="w-5 h-5"/> گزینه نهایی درست است!</> : <><XCircle className="w-5 h-5"/> گزینه نهایی اشتباه است.</>}
                       </div>
-                      <div className="text-sm prose max-w-none [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr">
+                      <div className={`${strictMathClasses} text-sm`}>
                         <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{quizData.problem_questions[currentQuestionIndex].explanation}</ReactMarkdown>
                       </div>
                     </div>
@@ -525,7 +544,8 @@ function App() {
               {viewMode === 'edit' ? (<textarea value={extractedText} onChange={(e) => setExtractedText(e.target.value)} className="w-full h-[600px] p-6 border-none rounded-xl bg-white outline-none" />) : (
                 <div ref={pdfRef} className="bg-white p-8 md:p-12 shadow-2xl min-h-[700px] border print-area print:shadow-none print:border-none print:p-4">
                   <div className="border-b-2 pb-4 mb-8 flex justify-between items-center"><div><h2 className="text-2xl font-black">{activeNote.title}</h2></div><div className="text-right"><span className="font-bold text-[#1E3A8A] text-xl">Ostad<span className="text-blue-500">AI</span></span></div></div>
-                  <div className="prose prose-lg max-w-none text-justify [&_.katex-display]:!text-left [&_.katex-display]:!dir-ltr"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{extractedText}</ReactMarkdown></div>
+                  {/* 🌟 اعمال سخت‌گیرانه‌ترین کلاس‌ها برای متن جزوه در PDF */}
+                  <div className={strictMathClasses}><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{extractedText}</ReactMarkdown></div>
                 </div>
               )}
             </div>

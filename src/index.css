@@ -1,12 +1,17 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
+
 @media print {
+  /* مخفی کردن المان‌های غیرضروری مثل منوها و دکمه‌ها */
   body * {
     visibility: hidden;
   }
+  
+  /* فقط کادر برگه جزوه را نشان بده */
   .print-area, .print-area * {
     visibility: visible;
   }
+  
   .print-area {
     position: absolute;
     left: 0;
@@ -14,29 +19,30 @@
     width: 100%;
     box-shadow: none !important;
     border: none !important;
-  }
-}
-@media print {
-  /* جلوگیری از بریده شدن فرمول‌ها و کسرها */
-  .katex-display {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin: 1.5em 0 !important;
-  }
-  
-  .katex {
-    line-height: 1.5 !important;
+    padding: 0 !important;
   }
 
-  /* جلوگیری از بریده شدن پاراگراف‌ها و لیست‌ها */
-  p, li, blockquote {
-    break-inside: avoid;
-    page-break-inside: avoid;
+  /* 🌟 جادوی اصلی برای فرمول‌ها 🌟 */
+  .katex {
+    /* ایزوله کردن کامل فرمول‌ها تا جهت متن فارسی خرابشون نکنه */
+    unicode-bidi: isolate !important;
+    /* جلوگیری از کشیده شدن خط کسر روی متن */
+    display: inline-block !important;
+    line-height: 1.2 !important;
   }
-  
-  /* باز کردن فضای کاغذ */
-  .prose {
-    max-width: none !important;
-    overflow: visible !important;
+
+  .katex-display {
+    /* فرمول‌های بزرگ (وسط خط) باید یک بلوک مستقل باشند */
+    display: block !important;
+    text-align: left !important;
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+    margin: 1.5em 0 !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* افزایش فاصله خطوط متن فارسی که روی فرمول نیفتد */
+  p, li {
+    line-height: 1.8 !important;
   }
 }
